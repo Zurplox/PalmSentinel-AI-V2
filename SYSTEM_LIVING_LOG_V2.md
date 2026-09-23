@@ -2,7 +2,7 @@
 
 > **Living Engineering Document & Decision Record**
 > *Target Audience: Autonomous AI Agents and engineers taking over this project.*
-> *Last Updated: 2026-09-23 08:20:00 Local Time*
+> *Last Updated: 2026-09-23 13:02:00 Local Time*
 > *Active Workspace: `E:\Freebuff\Palm Sentinel (V2)`*
 > *Predecessor, read-only reference: `F:\PalmSentinel-AI` (log: `SYSTEM_LIVING_LOG.md`)*
 > *This log follows the predecessor's method exactly, under a different name.*
@@ -780,3 +780,68 @@ record the supersession.
     140.0 SPH the dev path gives.
   * **`F:\PalmSentinel-AI` remains unmodified and read-only**: `git status
     --porcelain` empty at HEAD `cd0c22e`.
+### [2026-09-23 13:02] — Published: public repository with a standalone release asset, after a sweep before the first push
+
+* **Agent / Author**: Codebuff (Buffy)
+* **Files Modified**:
+  `.gitattributes` *(new)*, `.gitignore`, `README.md`, `SYSTEM_LIVING_LOG_V2.md`
+* **Changes Made**:
+  * **New repository, not an overwrite.**
+    <https://github.com/Zurplox/PalmSentinel-AI-V2> — public, matching the
+    predecessor's own visibility (`Zurplox/PalmSentinel-AI` is public). The
+    predecessor is left completely untouched, so V1's commit history and its
+    `SYSTEM_LIVING_LOG.md` survive as the read-only record this log's method is
+    copied from. Initial commit `a368080`: 39 files, 10,051 insertions, 2.9 MB.
+  * **`.gitignore` extended** with `.freebuff/` (editor/agent scratch that belongs
+    to the machine, not the project). It already excluded `dist/`, `build/`,
+    `.venv/`, `venv/`, `__pycache__/`, `launcher.log`, `output/`, `*.csv`,
+    `*.geojson` and every image format except the one demo mosaic — so the six
+    artifacts that prove nothing to a reader (196 MB of bundled interpreter, a
+    probe temp file, a launcher log, exported CSVs, a venv junction used to test
+    the preflight) are all absent from the tree by rule rather than by hand.
+  * **`.gitattributes` added**, because line endings are a correctness question
+    for two of the files here rather than a preference. `core.autocrlf` was on, so
+    a clone with it off would have delivered LF-only `.bat`/`.ps1` — and `cmd.exe`
+    parses a batch file line by line, which can mis-handle `goto`, which is exactly
+    what the launcher's preflight uses to skip its error block. `*.bat` and `*.ps1`
+    are now pinned `eol=crlf`; `*.exe` and image formats are marked `-text -diff`
+    so nothing ever tries to line-convert or text-diff a binary.
+  * **`README.md`** now points at the release for the download, and states what
+    that zip is: about 82 MB, unzip anywhere, run the executable, demo loads on
+    first run, unsigned so SmartScreen may warn. The V1 comparison harness is now
+    documented honestly as **optional and not self-contained** — it imports the
+    predecessor's engine and needs its 138 MP flight line, which is not in this
+    repository, and exits 1 with a message saying so when the checkout is absent.
+  * **Release `v2.0.0`** carries `PalmSentinelV2-win64.zip` (85,884,623 bytes,
+    sha256 `26277931440ee591935f08c72e4fc289f914110e5cd98f897684f3c40cc4efab`), so
+    the packaged build the user asked for is obtainable from the repository rather
+    than only from a build machine.
+  * **Housekeeping:** the log's own `Last Updated` header had read `08:20` since
+    the first pass while three entries were appended underneath it. Corrected.
+* **Verification**:
+  * **What was pushed is what was tested.** The release zip was extracted into a
+    fresh empty directory and the **extracted** copy was run there, from a shell
+    whose `PATH` held only `C:\Windows\System32` and `C:\Windows` (no
+    `python.exe`, `python3.exe` or `py.exe`):
+    `--check` -> `packaged build ... 16 routes, assets present`, exit 0;
+    `--selftest` -> `POST /api/census` 200, **140 palms, 140.0 SPH, 1.0 ha, band
+    optimal**, closest pair 169.532 px against 168.75 px required; CSV 200,
+    10,568 bytes, **140 palm rows**; `RESULT: PASS`. The asset is therefore the
+    same build the source tree produces, not merely a folder that happens to start.
+  * **Secret sweep over the committed set** (`git grep` on `HEAD` for
+    `gho_`/`ghp_`/`sk-`/`api_key`/`secret`/`password`/private-key headers/AWS key
+    IDs): no matches. No `.env`, `.pem`, `.key`, `.pfx`, `.p12` or `id_rsa` in the
+    tree.
+  * **Oversize check:** the 39 committed files total 2.9 MB, of which 2.4 MB is the
+    one demo orthomosaic the build and its self-test both require. The only large
+    thing in the workspace, `dist/` at 196 MB, is ignored and shipped as a release
+    asset instead.
+  * **Stray-artifact sweep before the first push:** `launcher.log`, the
+    `psv2-barevenv` junction used to exercise the preflight, the probe temp file
+    and the staged log/release-notes temp files were all confirmed absent from the
+    index; `git status --porcelain` was clean at the commit.
+  * `python -m unittest discover -s tests` -> **43 tests, OK**. The repository also
+    passes its own checks standalone: the test suite needs no imagery, no network
+    and no F: checkout.
+  * **`F:\PalmSentinel-AI` remains unmodified**: `git status --porcelain` empty at
+    HEAD `cd0c22e`, throughout this pass as in every pass before it.
