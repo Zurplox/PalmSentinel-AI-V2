@@ -57,6 +57,7 @@ export const initialState = {
   blockName: 'Blok 1',
   tilePx: 1536,
   threshold: 0,            // 0 means "derive with Otsu"
+  sensitivity: 0,          // 0..1, lowers the Otsu bar to catch weaker crowns
 
   // results
   census: null,

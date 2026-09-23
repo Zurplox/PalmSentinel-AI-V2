@@ -203,6 +203,7 @@ select.input {
 .note--warn { color: var(--warn); }
 .note--bad { color: var(--bad); }
 .note--ok { color: var(--ok); }
+.note--dim { opacity: .75; }
 .note code {
   font-family: var(--f-mono); font-size: 10.5px;
   background: var(--bg-sunken); padding: 1px 4px; border-radius: 3px; color: var(--text-2);

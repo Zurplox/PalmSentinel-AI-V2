@@ -2,7 +2,7 @@
 
 > **Living Engineering Document & Decision Record**
 > *Target Audience: Autonomous AI Agents and engineers taking over this project.*
-> *Last Updated: 2026-09-23 21:40:13 Local Time*
+> *Last Updated: 2026-09-23 22:29:37 Local Time*
 > *Active Workspace: `E:\Freebuff\Palm Sentinel (V2)`*
 > *Predecessor, read-only reference: `F:\PalmSentinel-AI` (log: `SYSTEM_LIVING_LOG.md`)*
 > *This log follows the predecessor's method exactly, under a different name.*
@@ -410,7 +410,7 @@ band edge — which is what pinned V1's results.
 ```powershell
 cd "E:\Freebuff\Palm Sentinel (V2)"
 
-# 1. Unit + invariant suite (86 tests)
+# 1. Unit + invariant suite (91 tests)
 python -m unittest discover -s tests -v
 
 # 1b. What the three harness flags print, against committed evidence (~11 s)
@@ -1323,3 +1323,25 @@ Kept deliberately: the direct-run `sys.path` shim (a measured `ModuleNotFoundErr
 **Verification.** `python -m unittest discover -s tests` → **86 tests, OK, 61 s** (was 83). Live UI probes as above on `python app.py --port 5177` with a sandbox data dir; all processes and listeners cleared afterwards. The standalone dev-server defect the owner reported is fixed; if they see any remaining wrong-size behaviour on *their* image, the extent path was measured correct end-to-end and the remaining suspect would be the image itself, not the app.
 
 **Also in this pass — the publish the owner requested.** All outstanding thread work (the refusal surface from 16:05, this fix) committed as one unit to `main` and pushed to `origin` (`https://github.com/Zurplox/PalmSentinel-AI-V2`), release `v2.0.4` published with the new asset, digest verified after upload. An untracked `docs/` landing site appeared in the tree — not this thread's work, left untracked and unjudged.
+
+### [2026-09-23 22:29] — Owner-reported UI pass: a closed polygon kept inviting vertices, spacing circles overlapped, and two missing controls
+
+**Agent/Author:** Buffy (Freebuff). Pass requested by the owner, verbatim: *"Once i closed the gap, the cursor is still letting me to continue to select - help me fix this. Let's focus on exe file first, once it's done, then we implement in github. Let me select how sensitive the app is also, this is definitely wrong calculation, I need you to completely fix this, see the circle overlaps with so many other palms - definitely not good. Look at it carefully and fix them. Ground sample distance, let us choose in meter, or just let us choose estimate of the hectares and show the drone height - at least we can cross-check."* The order was explicit: build and verify the executable first, publish second.
+
+**Defect 1 — after the polygon closed, the cursor kept drawing a next segment.** The state guard was already right (`#polygonClick` returns early on `roiClosed`, so no vertex could be appended), which is why this read as a live bug: the *painter* still drew a dashed rubber band from the last vertex to the pointer, and `panels` kept the crosshair cursor class, so the canvas kept inviting a click that would do nothing. `render.js` now falls back to no tail when the region is closed (`state.roiClosed ? null : polygon`), and the cursor class stands down for a closed polygon. Verified through real pointer events on the running app: crosshair present while drawing, absent after close, and a click inside the closed region leaves the vertex count at 3.
+
+**Defect 2 — the spacing circles, "definitely wrong calculation".** They were drawn at the full spacing floor (168.75 px radius at 4 cm/px), so every palm's circle overlapped several neighbours — visually contradicting the quality line directly beneath it ("No two palms are closer than the 6.750 m spacing floor"). The floor is a **centre-to-centre merge distance**: the radius at which a second detection becomes the same palm is half of it, which is what the loupe ring already used. The overlay now draws `min_spacing_m / 2`, so two circles touch exactly when a pair sits at the floor and any real overlap means a violation. Arithmetic from the demo census: floor 168.75 px, ring radius 84.375 px, closest accepted pair 169.532 px → **0.8 px of clearance, no overlap anywhere**. The count was never wrong; the drawing was at double scale.
+
+**Defect 3 — no way to choose sensitivity.** There was a raw "Vegetation threshold" slider buried in Advanced, in ExG units. It is now **Detection sensitivity** in the same place, 0–100%: 0 is plain Otsu, and a positive value lowers the region's threshold by that fraction of the interval between the Otsu bar and the region's background percentile, resolved once for the whole region exactly as Otsu is. The core carries it (`CensusConfig.sensitivity`, `Observation.sensitivity` reported in the payload). Measured on the demo: sensitivity 0 → threshold 59.039, 140 palms; sensitivity 0.5 → threshold 41.02, 141 palms — the bar drops and one weaker crown is admitted, never fewer. A sign error in the first draft would have *raised* the bar; it was caught by writing the test as a monotonic invariant (`high < low < baseline` thresholds, count never below baseline).
+
+**Defect 4 — GSD in metres, and a cross-check.** Section 2 now carries both units (cm/px and m/px, two-way bound to the one stored value), an estimated flight altitude for the current resolution (≈ GSD·3040 for a 20 MP / 84° FOV camera, labelled as a cross-check against the drone log rather than a fact), and a **Calibrate GSD** control that solves the resolution from a trusted area: pixels² · GSD² = area, so the corrected GSD is the current one scaled by √(declared/measured). Verified live: typing 0.05 m/px set 5 cm/px; declaring 0.25 ha on a mosaic measuring 1.0 ha solved GSD to exactly 2 cm/px and the mosaic then reported 0.25 ha.
+
+**Also worth recording, because it was measured:** the ROI area readout is correct. A probe showed an absurd 5,000 ha, which turned out to be the harness, not the app — the preview had loaded with a degenerate viewport, so the camera's fit scale was ~0.0004 and synthetic clicks landed ~750,000 px off-canvas; after pressing Fit the same triangle read 0.0092 ha, which is right for its size. Recorded because "the calculation looks wrong" is exactly the kind of report that deserves the arithmetic rather than an assurance.
+
+**Tests, 86 → 91.** `tests/test_core.py::TestSensitivity` (the monotonic invariant above, on a synthetic plantation), and four client-contract checks in `tests/test_ui_contract.py` (the ring radius is half the floor; the rubber band stops at close; the metres input exists and converts; sensitivity reaches the census payload and the endpoint reads it). The one golden that legitimately moved is `tests/golden/selftest.txt`, by exactly two lines — the index and stylesheet byte counts, 19,223 → 20,299 and 25,031 → 25,060 — regenerated deliberately with `--regenerate`; census and all four export byte counts are unchanged. `91 tests, OK, 71 s`.
+
+**The executable, built and verified first, as instructed.** Clean `rm -rf build dist` → `pyinstaller --clean --noconfirm`, then from the built tree: `--check` OK (16 routes, assets present), `--selftest` PASS (140 palms / 140.0 SPH / 1.0 ha, csv 10,568 · geojson 54,288 · annotated 3,006,439), `--selftest --window` PASS with the page rendering its own CSV. The four fixes were confirmed present *inside* the bundle by grepping the packaged assets, not assumed from the build. Archive `PalmSentinelV2-win64.zip`, 264 entries, **82,925,583 bytes**, sha256 `5c3e2b7ea28cee3190a101a31460219bfaf83868df29a5dfae241b067885e1d1`; no top-level `data/` folder ships (the bundled demo stays in `_internal\data\`, and the first run seeds the library), which was checked rather than trusted after a first zip accidentally included a `data/` folder created by running the self-tests in the build directory. Published as **v2.0.5**, README updated with the size and digest.
+
+**Files modified:** `templates/index.html`, `static/css/app.css`, `static/js/{state,main,panels,render}.js`, `palmsentinel/pipeline.py`, `palmsentinel/detection.py`, `web/views.py`, `tests/{test_core,test_ui_contract}.py`, `tests/golden/selftest.txt`, `README.md`, this log.
+
+**Not modified:** the detector, tiling, agronomy standards, exports, `desktop_app.py`, `ports.py`, `verification.py`, `Launcher.cs`, `PalmSentinelV2.spec`. `F:\PalmSentinel-AI` untouched.

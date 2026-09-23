@@ -35,7 +35,8 @@ export class Panels {
     for (const id of [
       'file-name', 'file-meta', 'file-summary', 'btn-open-image', 'btn-pick-file', 'btn-fit',
       'btn-native', 'btn-shortcuts', 'file-input', 'btn-upload', 'select-flight', 'input-path',
-      'btn-path', 'note-decode', 'input-gsd', 'note-extent', 'seg-standard', 'note-standard',
+      'btn-path', 'note-decode', 'input-gsd', 'input-gsd-m', 'note-extent', 'note-altitude',
+      'input-area', 'btn-calibrate', 'note-calibrate', 'seg-standard', 'note-standard',
       'note-spacing', 'tool-toolbar', 'btn-undo', 'btn-clear', 'note-roi', 'input-block',
       'btn-run', 'run-label', 'note-run', 'input-tile', 'out-tile', 'input-threshold',
       'out-threshold', 'loupe-img', 'loupe-empty', 'loupe-overlay', 'loupe-ring',
@@ -96,6 +97,32 @@ export class Panels {
       }
     });
 
+    // The same GSD in metres per pixel, for drone logs quoted in metres.
+    e['input-gsd-m'].addEventListener('change', () => {
+      const metres = Number.parseFloat(e['input-gsd-m'].value);
+      if (Number.isFinite(metres) && metres > 0) this.actions.setGsd(metres * 100);
+    });
+    e['input-gsd-m'].addEventListener('input', () => {
+      const metres = Number.parseFloat(e['input-gsd-m'].value);
+      if (Number.isFinite(metres) && metres > 0) {
+        this.store.patch({ gsdCm: metres * 100 });
+      }
+    });
+
+    // Solve the GSD from a trusted area (estate record), as a cross-check.
+    const calibrate = () => {
+      const ha = Number.parseFloat(e['input-area'].value);
+      if (Number.isFinite(ha) && ha > 0) this.actions.calibrateGsdFromArea(ha);
+      else this.toast('warn', 'Enter the block area in hectares first.');
+    };
+    e['btn-calibrate'].addEventListener('click', calibrate);
+    e['input-area'].addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        calibrate();
+      }
+    });
+
     e['seg-standard'].addEventListener('click', (event) => {
       const button = event.target.closest('button[data-standard]');
       if (button) this.store.patch({ standardKey: button.dataset.standard });
@@ -134,7 +161,8 @@ export class Panels {
 
     e['input-threshold'].addEventListener('input', (event) => {
       const value = Number(event.target.value);
-      e['out-threshold'].textContent = value === 0 ? 'auto' : String(value);
+      this.store.patch({ sensitivity: value / 100 });
+      e['out-threshold'].textContent = value === 0 ? 'auto' : `${value}%`;
       this.store.patch({ threshold: value });
     });
 
@@ -244,8 +272,11 @@ export class Panels {
     for (const button of e['tool-toolbar'].querySelectorAll('button[data-tool]')) {
       button.classList.toggle('is-active', button.dataset.tool === state.tool);
     }
-    const cursor = { polygon: 'is-crosshair', box: 'is-crosshair', edit: 'is-editing', pan: 'is-panning' };
-    e.stage.className = `stage ${cursor[state.tool] || ''}`.trim();
+    // A closed polygon is an object now, not a drawing in progress: the
+    // crosshair stands down so the pointer stops inviting another vertex.
+    const cursorClasses = { polygon: 'is-crosshair', box: 'is-crosshair', edit: 'is-editing', pan: 'is-panning' };
+    const cursor = state.tool === 'polygon' && state.roiClosed ? '' : cursorClasses[state.tool] || '';
+    e.stage.className = `stage ${cursor}`.trim();
 
     e['chk-palms'].checked = state.overlays.palms;
     e['chk-ids'].checked = state.overlays.ids;
@@ -255,9 +286,13 @@ export class Panels {
     e.navigator.hidden = !state.overlays.minimap;
 
     e['input-gsd'].value = String(state.gsdCm);
+    if (document.activeElement !== e['input-gsd-m']) {
+      e['input-gsd-m'].value = (state.gsdCm / 100).toFixed(3);
+    }
     e['input-tile'].value = String(state.tilePx);
     e['out-tile'].textContent = String(state.tilePx);
-    e['out-threshold'].textContent = state.threshold === 0 ? 'auto' : String(state.threshold);
+    e['input-threshold'].value = String(Math.round(state.sensitivity * 100));
+    e['out-threshold'].textContent = state.sensitivity === 0 ? 'auto' : `${Math.round(state.sensitivity * 100)}%`;
     if (document.activeElement !== e['input-block']) e['input-block'].value = state.blockName;
 
     this.#renderStandards(state);
@@ -320,6 +355,14 @@ export class Panels {
     e['note-extent'].textContent =
       `${num(image.extent_m[0], 1)} m × ${num(image.extent_m[1], 1)} m · ` +
       `${num(image.full_area_ha, 4)} ha at this GSD.`;
+    // Cross-check, not a fact: the height above canopy that a ~20 MP camera
+    // with an 84° horizontal FOV flies at to produce this GSD (h ≈ GSD·3040).
+    // Orthos are stitched, so the drone log is the authority; this catches a
+    // GSD typed an order of magnitude wrong.
+    e['note-altitude'].hidden = false;
+    const altitudeM = Math.round(((image.gsd_cm_per_px / 100) * 3040) / 5) * 5;
+    e['note-altitude'].textContent =
+      `≈ ${int(altitudeM)} m above canopy for this resolution (20 MP camera, 84° FOV) — cross-check against the drone log.`;
     e['ro-gsd'].textContent = `${state.gsdCm} cm/px`;
     e['nav-res'].textContent = `${num(image.gsd_cm_per_px, 2)} cm/px`;
 

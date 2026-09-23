@@ -45,6 +45,7 @@ const panels = new Panels({
     loadFile,
     loadPath,
     setGsd,
+    calibrateGsdFromArea,
     runCensus,
     exportCsv,
     exportGeoJson,
@@ -129,8 +130,12 @@ store.subscribe((state) => {
   }
 
   const standard = state.standards[state.standardKey];
+  // The overlay shows the *merge* radius -- half the spacing floor -- because
+  // that is the distance at which a second detection becomes the same palm.
+  // Drawing the full floor made every circle overlap several neighbours and
+  // read as an error rather than a floor.
   renderer.exclusionRadiusPx = standard
-    ? standard.min_spacing_m / (state.gsdCm / 100)
+    ? standard.min_spacing_m / (state.gsdCm / 100) / 2
     : 0;
 
   redraw();
@@ -196,6 +201,23 @@ async function setGsd(value) {
   }
 }
 
+/**
+ * Solve the GSD from a trusted area: the whole orthomosaic is known to cover
+ * N ha, so pixels² · (GSD)² = area. Only a guess-improver for the common case
+ * where the drone log is lost but the estate record is not.
+ */
+function calibrateGsdFromArea(areaHa) {
+  const state = store.get();
+  if (!state.image || !(areaHa > 0)) return;
+  const current = state.image.full_area_ha; // hectares at the current GSD
+  if (!(current > 0)) return;
+  // Area scales with GSD², so the corrected GSD is the current one scaled by
+  // sqrt(target/current).
+  const corrected = state.gsdCm * Math.sqrt(areaHa / current);
+  setGsd(Math.round(corrected * 1000) / 1000);
+  panels.toast('ok', `GSD set to ${corrected.toFixed(3)} cm/px so the mosaic covers ${areaHa} ha.`);
+}
+
 async function runCensus() {
   const state = store.get();
   if (!state.image) {
@@ -216,6 +238,7 @@ async function runCensus() {
       gsd_cm: state.gsdCm,
       tile_px: state.tilePx,
       threshold: state.threshold > 0 ? state.threshold : null,
+      sensitivity: state.sensitivity > 0 ? state.sensitivity : 0,
       manual_add: state.manualAdd,
       manual_remove: state.manualRemove,
     };

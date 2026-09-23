@@ -124,6 +124,8 @@ class Observation:
     index: str
     threshold: float
     background: float
+    sensitivity: float = 0.0
+    """The fraction actually applied to lower the threshold (0 when none was)."""
 
     def describe(self) -> str:
         return (

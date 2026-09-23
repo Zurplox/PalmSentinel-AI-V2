@@ -268,5 +268,30 @@ class TestRasterIdentityContract(unittest.TestCase):
         self.assertIn("api.previewUrl()", render_js)
 
 
-if __name__ == "__main__":
-    unittest.main()
+class TestOverlaySemanticsContract(unittest.TestCase):
+    """The spacing-circle overlay must show the merge radius, not the floor."""
+
+    def test_the_circle_radius_is_half_the_spacing_floor(self):
+        """Drawing the full floor overlapped every neighbour and read as a bug."""
+        main_js = (JS_DIR / "main.js").read_text(encoding="utf-8")
+        match = re.search(r"exclusionRadiusPx\s*=\s*standard\n\s*\?([^;]+);", main_js)
+        self.assertIsNotNone(match, "exclusionRadiusPx assignment not found")
+        self.assertIn("/ 2", match.group(1), "the overlay radius must be half the spacing floor")
+
+    def test_the_rubber_band_stops_when_the_polygon_closes(self):
+        render_js = (JS_DIR / "render.js").read_text(encoding="utf-8")
+        self.assertIn("state.roiClosed ? null : polygon", render_js)
+
+    def test_gsd_has_a_metres_per_pixel_input(self):
+        template = TEMPLATE.read_text(encoding="utf-8")
+        self.assertIn('id="input-gsd-m"', template)
+        panels_js = (JS_DIR / "panels.js").read_text(encoding="utf-8")
+        self.assertIn("metres * 100", panels_js)
+
+    def test_sensitivity_reaches_the_census_payload(self):
+        main_js = (JS_DIR / "main.js").read_text(encoding="utf-8")
+        self.assertIn("sensitivity: state.sensitivity", main_js)
+        from web.views import census  # the endpoint accepts it without error
+        import inspect
+        source = inspect.getsource(census)
+        self.assertIn('body.get("sensitivity")', source)

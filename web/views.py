@@ -332,12 +332,14 @@ def census() -> Response:
     try:
         tile_px = int(body.get("tile_px") or 1536)
         threshold = body.get("threshold")
+        sensitivity = float(body.get("sensitivity") or 0.0)
         config = CensusConfig(
             standard=PALM_STANDARDS[standard_key],
             scale=GroundScale(gsd_cm),
             polygon=polygon,
             tile_px=max(256, min(tile_px, 8192)),
             vegetation_threshold=float(threshold) if threshold is not None else None,
+            sensitivity=max(0.0, min(sensitivity, 1.0)),
             manual_additions=_parse_points(body.get("manual_add")),
             manual_removals=_parse_points(body.get("manual_remove")),
         )
@@ -409,6 +411,7 @@ def _census_payload(result: CensusResult) -> Dict[str, Any]:
             "index": result.observation.index,
             "threshold": round(result.observation.threshold, 3),
             "background": round(result.observation.background, 3),
+            "sensitivity": round(result.observation.sensitivity, 3),
         },
         "detector": {
             "blur_ksize": result.params.blur_ksize,

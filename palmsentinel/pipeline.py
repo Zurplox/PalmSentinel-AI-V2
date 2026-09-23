@@ -85,6 +85,12 @@ class CensusConfig:
     tile_px: int = 1536
     index: str = "exg"
     vegetation_threshold: Optional[float] = None
+    sensitivity: float = 0.0
+    """0..1 fraction that lowers the Otsu vegetation threshold.
+
+    0 is plain Otsu. 1.0 would place the threshold at the vegetation mean,
+    which is far too aggressive; useful values sit in 0..0.5.
+    """
     manual_additions: Tuple[Point, ...] = ()
     """Full-resolution points at which an operator asserts a palm exists.
 
@@ -356,6 +362,23 @@ def run_census(image_bgr: ArrayLike, config: CensusConfig) -> CensusResult:
             index=config.index,
             threshold=float(config.vegetation_threshold),
             background=observation.background,
+        )
+    elif config.sensitivity > 0:
+        # Sensitivity slides the Otsu threshold down so weaker crowns -- young
+        # palms, drought-stressed crowns, hazy captures -- still read as
+        # vegetation. The setting is a fraction of the interval between the
+        # Otsu threshold and the region's background level (its non-canopy
+        # percentile, which sits *below* the threshold): 0 is exactly Otsu,
+        # 1.0 would drop the bar onto the background mode itself, and useful
+        # values sit in 0..0.5. Resolved once, here, for the whole region --
+        # the same discipline as Otsu itself.
+        span = observation.threshold - observation.background
+        lowered = observation.threshold - config.sensitivity * span
+        observation = Observation(
+            index=config.index,
+            threshold=float(max(1.0, lowered)),
+            background=observation.background,
+            sensitivity=float(config.sensitivity),
         )
 
     params = DetectorParams.from_standard(config.standard, config.scale, config.index)

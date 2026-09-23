@@ -426,5 +426,48 @@ class TestSpacingMeasurement(unittest.TestCase):
         self.assertAlmostEqual(summary["nn_mode_m"], 9.0, delta=0.6)
 
 
+class TestSensitivity(unittest.TestCase):
+    """
+    The sensitivity control lowers the region's vegetation threshold.
+
+    The demo-class failure it must not cause is a count *collapse*: the bar
+    drops, weaker crowns join, spacing suppression absorbs some -- but the
+    accepted count must never fall below the plain-Otsu census.
+    """
+
+    def test_threshold_lowers_monotonically_and_count_never_collapses(self):
+        from palmsentinel.pipeline import CensusConfig, run_census
+
+        scale = GroundScale(4.0)
+        points = triangular_lattice(9.0, 8, 8)
+        image, polygon = render_plantation(
+            points, scale, crown_radius_m=4.0, apex_radius_m=1.2,
+            margin_m=4.0,
+        )
+
+        def census(sensitivity):
+            return run_census(
+                image,
+                CensusConfig(
+                    standard=get_standard("mature"),
+                    scale=scale,
+                    polygon=polygon,
+                    sensitivity=sensitivity,
+                ),
+            )
+
+        baseline = census(0.0)
+        low = census(0.25)
+        high = census(0.5)
+        # The applied bar actually drops, and drops further as sensitivity rises.
+        self.assertLess(low.observation.threshold, baseline.observation.threshold)
+        self.assertLess(high.observation.threshold, low.observation.threshold)
+        self.assertEqual(low.observation.sensitivity, 0.25)
+        self.assertEqual(baseline.observation.sensitivity, 0.0)
+        # Suppression may absorb added candidates, but the census may not lose
+        # palms it had already found at the stricter bar.
+        self.assertGreaterEqual(low.total_palms, baseline.total_palms)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

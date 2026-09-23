@@ -349,9 +349,9 @@ export class MapRenderer {
       }
     }
 
-    // Rubber band to the pointer.
-    const tail = draft && draft.length ? draft : polygon;
-    if (tail.length && frame.cursor && !frame.pointerDown) {
+    // Rubber band to the pointer, only while a polygon is still open.
+    const tail = draft && draft.length ? draft : (state.roiClosed ? null : polygon);
+    if (tail && tail.length && frame.cursor && !frame.pointerDown) {
       const [lx, ly] = camera.toScreen(tail[tail.length - 1][0], tail[tail.length - 1][1]);
       ctx.beginPath();
       ctx.moveTo(lx, ly);

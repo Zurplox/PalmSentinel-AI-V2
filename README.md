@@ -17,9 +17,9 @@ Full analysis, numbers and evidence: [`SYSTEM_LIVING_LOG_V2.md`](SYSTEM_LIVING_L
 
 ### The packaged build — needs nothing installed
 
-**[Download the standalone Windows build (v2.0.4)](https://github.com/Zurplox/PalmSentinel-AI-V2/releases/latest)**
-— `PalmSentinelV2-win64.zip`, 82,923,834 bytes (~79 MB), sha256
-`b7ea85a52a7436c8d7c328bdfa154754deaf2d4f32e1a6b2e9a8e5f9b5ebb9ae`. Unzip it anywhere and run
+**[Download the standalone Windows build (v2.0.5)](https://github.com/Zurplox/PalmSentinel-AI-V2/releases/latest)**
+— `PalmSentinelV2-win64.zip`, 82,925,583 bytes (~79 MB), sha256
+`5c3e2b7ea28cee3190a101a31460219bfaf83868df29a5dfae241b067885e1d1`. Unzip it anywhere and run
 `PalmSentinelV2.exe` from inside; the bundled demo orthomosaic loads on first run,
 so the first census works with nothing else installed. Windows SmartScreen may warn
 about an unknown publisher, because the build is not code-signed.
@@ -148,7 +148,7 @@ UI — it reads the rendered numbers back out of the page.
 Tests:
 
 ```
-python -m unittest discover -s tests     # 86 tests, ~60 s, no imagery or network needed
+python -m unittest discover -s tests     # 91 tests, ~70 s, no imagery or network needed
 python tests/ground_truth.py             # the true-versus-recovered tables, ~3.5 min
 ```
 
