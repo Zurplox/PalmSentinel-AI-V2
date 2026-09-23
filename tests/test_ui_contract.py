@@ -278,6 +278,26 @@ class TestOverlaySemanticsContract(unittest.TestCase):
         self.assertIsNotNone(match, "exclusionRadiusPx assignment not found")
         self.assertIn("/ 2", match.group(1), "the overlay radius must be half the spacing floor")
 
+    def test_the_merge_ring_and_the_rosette_ring_are_separate_switches(self):
+        """One tick drew both families: the merge radius (a floor that never
+        reaches a neighbour) and the measured rosette radius (which overlaps
+        neighbours by construction on a closed canopy). Measured on the owner's
+        138 MP mosaic, the merge rings overlapped nothing while 335 rosette
+        pairs overlapped -- under a label that named only the floor."""
+        render_js = (JS_DIR / "render.js").read_text(encoding="utf-8")
+        self.assertIn("const showMerge = state.overlays.exclusion;", render_js)
+        self.assertIn("const showRosette = state.overlays.rosette;", render_js)
+        self.assertIn("if (showMerge && radiusOnScreen > 4)", render_js)
+        # The rosette ring had no gate at all, so it was always drawn: assert the
+        # switch is actually consulted, not merely declared.
+        self.assertIn("if (showRosette && rosetteOnScreen >= 3.5)", render_js)
+        state_js = (JS_DIR / "state.js").read_text(encoding="utf-8")
+        self.assertIn("rosette: false", state_js)
+        template = TEMPLATE.read_text(encoding="utf-8")
+        self.assertIn('id="chk-rosette"', template)
+        panels_js = (JS_DIR / "panels.js").read_text(encoding="utf-8")
+        self.assertIn("'palms', 'ids', 'exclusion', 'rosette'", panels_js)
+
     def test_the_rubber_band_stops_when_the_polygon_closes(self):
         render_js = (JS_DIR / "render.js").read_text(encoding="utf-8")
         self.assertIn("state.roiClosed ? null : polygon", render_js)

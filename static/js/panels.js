@@ -55,7 +55,7 @@ export class Panels {
       e[id] = $(id);
     }
 
-    for (const input of ['chk-palms', 'chk-ids', 'chk-exclusion', 'chk-minimap', 'chk-edges', 'chk-scale-image']) {
+    for (const input of ['chk-palms', 'chk-ids', 'chk-exclusion', 'chk-rosette', 'chk-minimap', 'chk-edges', 'chk-scale-image']) {
       e[input] = $(input);
     }
     this.#bind();
@@ -136,7 +136,7 @@ export class Panels {
     e['btn-undo'].addEventListener('click', () => this.actions.undo());
     e['btn-clear'].addEventListener('click', () => this.actions.clearRegion());
 
-    for (const key of ['palms', 'ids', 'exclusion', 'minimap', 'edges']) {
+    for (const key of ['palms', 'ids', 'exclusion', 'rosette', 'minimap', 'edges']) {
       const input = e[`chk-${key}`];
       input.addEventListener('change', () => {
         const overlays = { ...this.store.get().overlays, [key]: input.checked };
@@ -289,6 +289,7 @@ export class Panels {
     e['chk-palms'].checked = state.overlays.palms;
     e['chk-ids'].checked = state.overlays.ids;
     e['chk-exclusion'].checked = state.overlays.exclusion;
+    e['chk-rosette'].checked = state.overlays.rosette;
     e['chk-minimap'].checked = state.overlays.minimap;
     e['chk-edges'].checked = state.overlays.edges;
     e.navigator.hidden = !state.overlays.minimap;

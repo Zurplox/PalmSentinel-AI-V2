@@ -17,9 +17,9 @@ Full analysis, numbers and evidence: [`SYSTEM_LIVING_LOG_V2.md`](SYSTEM_LIVING_L
 
 ### The packaged build — needs nothing installed
 
-**[Download the standalone Windows build (v2.0.6)](https://github.com/Zurplox/PalmSentinel-AI-V2/releases/latest)**
-— `PalmSentinelV2-win64.zip`, 82,932,362 bytes (~79 MB), sha256
-`6bfd693c1e989bf43badd08460d7448aa3e2f210b07516038b1bfe5755fdcdf1`. Unzip it anywhere and run
+**[Download the standalone Windows build (v2.0.7)](https://github.com/Zurplox/PalmSentinel-AI-V2/releases/latest)**
+— `PalmSentinelV2-win64.zip`, 82,930,271 bytes (~79 MB), sha256
+`c71181f4858f0bf8bf1a287e47fb63b15e37d7f8c0b04eea43d67288f0b39903`. Unzip it anywhere and run
 `PalmSentinelV2.exe` from inside; the bundled demo orthomosaic loads on first run,
 so the first census works with nothing else installed. Windows SmartScreen may warn
 about an unknown publisher, because the build is not code-signed.
@@ -148,7 +148,7 @@ UI — it reads the rendered numbers back out of the page.
 Tests:
 
 ```
-python -m unittest discover -s tests     # 101 tests, ~80 s, no imagery or network needed
+python -m unittest discover -s tests     # 102 tests, ~80 s, no imagery or network needed
 python tests/ground_truth.py             # the true-versus-recovered tables, ~3.5 min
 ```
 
@@ -294,6 +294,34 @@ band (6.9% against 13.5%), but on real imagery the radius does most of its work
 suppressing frond apexes — 628 raw candidates become 140 on the demo — and a
 uniform synthetic crown cannot measure that side of the trade. 0.75 therefore
 stands, and settling the last 0.05 needs a hand-labelled real patch.
+
+### What the circles mean
+
+The Overlays panel carries two separate switches, because they draw two
+different things and only one of them is a floor.
+
+* **Merge-radius circles** — half the minimum-spacing floor around each palm
+  (84.4 px at 4 cm/px, mature standard). Two circles touch exactly when a pair
+  sits at the floor, so a circle can never reach a neighbouring palm; if one ever
+  does, the spacing invariant is broken. Measured on the owner's own 138 MP
+  `blok_tm_utara` mosaic (2,231 palms over the whole frame): closest pair
+  **168.772 px against a 168.75 px floor** — **0** palms inside another palm's
+  circle, **0** overlapping pairs, 0.022 px of clearance. The demo gives the same
+  result with 0.8 px. Verified as drawn, not just as computed: diffing the canvas
+  against the same view with the switch off puts every ring at 84.4 px
+  (92.5 canvas px at 109.6% device scale) and no second family.
+* **Measured rosette radius** — the crown/rosette radius measured per palm
+  (0.40–6.00 m on that mosaic, median 1.52 m), *not* a floor. These rings do
+  overlap neighbouring crowns — 335 pairs on the real block, worst 1.77× —
+  because the crowns themselves touch on a closed canopy. Overlap there is the
+  measurement, not a violation, which is why it has its own switch and is off by
+  default.
+
+Both families used to be drawn by the single switch labelled "merge-radius
+circles", and the rosette rings had no switch at all — they were painted whenever
+they were large enough on screen. Anyone looking at that picture reasonably
+concluded the floor was broken. The two are separate now, and the default view
+draws neither.
 
 ### What this does not verify
 

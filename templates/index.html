@@ -186,7 +186,8 @@
       <h2 class="group__title"><span class="group__n">6</span>Overlays</h2>
       <label class="check"><input type="checkbox" id="chk-palms" checked><span>Palm markers</span></label>
       <label class="check"><input type="checkbox" id="chk-ids"><span>Palm identifiers</span></label>
-      <label class="check"><input type="checkbox" id="chk-exclusion"><span title="Half the minimum-spacing floor around each palm: two touching circles sit exactly at the floor, so overlap would mean a violation">Merge-radius circles</span></label>
+      <label class="check"><input type="checkbox" id="chk-exclusion"><span title="Half the minimum-spacing floor around each palm. Two circles touch exactly when a pair sits at the floor, so a circle can never reach a neighbouring palm — if one does, the spacing invariant is broken.">Merge-radius circles</span></label>
+      <label class="check"><input type="checkbox" id="chk-rosette"><span title="The crown/rosette radius measured for each palm, not a floor. On a closed canopy these rings do overlap neighbouring crowns, because the crowns themselves touch — that is the measurement, not a spacing violation.">Measured rosette radius</span></label>
       <label class="check"><input type="checkbox" id="chk-minimap" checked><span>Overview navigator</span></label>
       <label class="check"><input type="checkbox" id="chk-edges" checked><span>Ground distances on ROI edges</span></label>
     </section>

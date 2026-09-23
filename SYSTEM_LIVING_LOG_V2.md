@@ -2,7 +2,7 @@
 
 > **Living Engineering Document & Decision Record**
 > *Target Audience: Autonomous AI Agents and engineers taking over this project.*
-> *Last Updated: 2026-09-24 00:13:30 Local Time*
+> *Last Updated: 2026-09-24 00:47:00 Local Time*
 > *Active Workspace: `E:\Freebuff\Palm Sentinel (V2)`*
 > *Predecessor, read-only reference: `F:\PalmSentinel-AI` (log: `SYSTEM_LIVING_LOG.md`)*
 > *This log follows the predecessor's method exactly, under a different name.*
@@ -410,7 +410,7 @@ band edge — which is what pinned V1's results.
 ```powershell
 cd "E:\Freebuff\Palm Sentinel (V2)"
 
-# 1. Unit + invariant suite (101 tests)
+# 1. Unit + invariant suite (102 tests)
 python -m unittest discover -s tests -v
 
 # 1b. What the three harness flags print, against committed evidence (~11 s)
@@ -1381,3 +1381,20 @@ Kept deliberately: the direct-run `sys.path` shim (a measured `ModuleNotFoundErr
 **Not modified:** the detector geometry, tiling, agronomy standards, exports, `desktop_app.py`, `ports.py`, `verification.py`, `Launcher.cs`, `PalmSentinelV2.spec`. `F:\PalmSentinel-AI` untouched.
 
 **Verification.** `python -m unittest discover -s tests` → **101 tests, OK, ~81 s** (was 98). `--regenerate` reports all three harness transcripts unchanged, so the committed evidence still matches the code. Packaged and extracted-archive checks as above; live UI probes (source and packaged) on sandbox data dirs with every process and listener cleared afterwards. One thing left as found: an untracked `docs/` landing site in the tree, not this thread's work — left out of the commit and out of the bundle.
+### [2026-09-24 00:47] — The circle complaint was still visible, for a different reason: the measured-rosette rings had no switch at all
+
+**Agent/Author:** Buffy (Freebuff), on the owner's instruction: *"Previous issue like this, make sure it's solved in the previous prompt (circle is covering more than 1 tree). If tested and verified, skip the fix in this turn. Make sure now the app is working as intended and free of errors and ready to use for proper professionals without errors"* — with their own 138 MP mosaic offered as the test input.
+
+**The reported issue, tested on the owner's own imagery — and it is fixed.** Their `Jalan-Lintas-S5080iak-Tumang-3-7-2026-orthophoto-2.jpg` (9,217 × 14,980 px, 138.1 MP, 62.7 MB) imported into the packaged build in 1.4 s showing the **full frame** — the "small portion" defect does not reproduce on real data. The documented ROI census reproduces the published figure exactly: **1,360 palms / 124.7 SPH / 10.9064 ha**, 36 tiles, 12.6 s, closest accepted pair **168.834 px against the 168.75 px floor**, 0 palms outside the ROI, CSV 105,782 bytes / 1,360 rows, GeoJSON 527,994 bytes, and nothing in the app's log. Whole-frame census: 2,231 palms / 101.0 SPH / 22.0913 ha in 20.4 s. Against those real coordinates the merge-radius circle (radius = floor/2 = 84.375 px) contains **0** palm centres and neighbouring rings clear each other by **0.084 px** — a circle cannot cover a second tree.
+
+**But the picture could still show it, and that is the defect this pass fixes.** `render.js` drew the per-palm **measured-rosette** rings *unconditionally* — `if (rosetteOnScreen >= 3.5)`, with no overlay flag at all — while the switch labelled "Merge-radius circles" gated only the merge ring. So one tick drew two families, and the overlapping one was never the floor: on the owner's whole frame the rosette rings (0.40–6.00 m, median 1.52 m) overlapped their neighbours in **335 pairs, worst 1.77×**, because on a closed canopy the crowns themselves touch. A rosette ring overlapping a neighbour is the measurement doing its job; a *merge* ring doing it would be the invariant breaking. Under a label that named only the floor, the two were indistinguishable, and the reviewer's complaint reproduced for a reason the previous pass had not found.
+
+**The fix:** the rosette ring gets its own switch (`state.overlays.rosette`, `#chk-rosette`, "Measured rosette radius", off by default) and is gated by it; the merge ring is gated by a now-honestly-named `showMerge`; neither is drawn by default. Pinned by `test_the_merge_ring_and_the_rosette_ring_are_separate_switches`, mutation-proven (re-gating the rosette ring behind the merge switch fails it). Note on the first version of that test: it asserted only that `showRosette` was *declared*, which passed while the variable was unused — it now asserts the ring's gate consults it, because a declaration is not a behaviour.
+
+**Verified as drawn, not as computed.** Two probe mistakes are worth recording because both would have produced a false verdict. A greenness-ridge detector returned 34 px rings on canopy texture — useless. A canvas-diff against a baseline captured *before* the census finished counted every palm marker as a change. The method that worked: diff the canvas against the same view with the overlay off, then measure each palm marker's distance to the changed pixels. Result on the owner's mosaic at native resolution (canvas device scale 1.0962): merge rings = **5,086** changed pixels, first crossing at median **88 px** (centreline 92.5 canvas px = 84.375 CSS px); rosette rings = **2,478** pixels at median **38 px**; the two compose additively and independently (base→merge 5,086; +rosette 2,478; rosette alone 2,478); with both switches off, zero ring pixels.
+
+**Rebuilt and republished, as the owner asked.** Clean `rm -rf build dist` → `pyinstaller --clean --noconfirm`; `--check`, `--selftest` and `--selftest --window` all pass (140 palms / 140.0 SPH and identical export bytes) and again from a clean extract of the shipped archive with `PATH` scrubbed of Python, where the shipped build was then re-probed on the real mosaic (1,360 / 124.7, 0 palms inside another's circle, exports written). One golden line moved deliberately — the index page grew by the new control, 20,810 → **21,215 bytes** — with census and all four export byte counts unchanged (102 tests OK, was 101).
+
+**Files modified:** `static/js/render.js` (both gates), `static/js/state.js` (`overlays.rosette`), `static/js/panels.js` (bind, listen, sync), `templates/index.html` (the second switch with an honest tooltip for each), `tests/test_ui_contract.py`, `tests/golden/selftest.txt`, `README.md` (the two overlays and the measured evidence), this log.
+
+**Not modified:** the pipeline, detection, tiling, agronomy standards, thresholds, exports, `web/`, `desktop_app.py`, `ports.py`, `verification.py`, `Launcher.cs`, `PalmSentinelV2.spec`. `F:\PalmSentinel-AI` untouched.

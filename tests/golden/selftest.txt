@@ -5,7 +5,7 @@ assets      : <REPO>
 library     : <REPO>\data
 demo asset  : <REPO>\data\demo_palm_estate.jpg
 
-GET /                    -> 200, 20810 bytes
+GET /                    -> 200, 21215 bytes
 GET /static/css/app.css  -> 200, 25060 bytes
 POST /api/image           -> 200, demo_palm_estate.jpg 2500x2500 @ 4.0 cm/px
 GET /api/preview         -> 200, 2656531 bytes

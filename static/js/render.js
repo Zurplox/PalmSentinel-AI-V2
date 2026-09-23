@@ -238,7 +238,14 @@ export class MapRenderer {
     const view = this.#visible(frame);
     const margin = 30 / camera.scale;
     const showIds = state.overlays.ids;
-    const showRosette = state.overlays.exclusion;
+    // Two different circles, two different meanings, two different switches.
+    // The merge radius is the floor (half the minimum spacing), so it can never
+    // reach a neighbour's centre; the rosette radius is *measured per palm* and
+    // on a closed canopy it legitimately overlaps neighbouring crowns. Drawing
+    // both under one tick, labelled "merge-radius circles", read as the floor
+    // being broken.
+    const showMerge = state.overlays.exclusion;
+    const showRosette = state.overlays.rosette;
     const radiusOnScreen = (this.exclusionRadiusPx || 0) * camera.scale;
 
     ctx.lineWidth = 1;
@@ -257,7 +264,7 @@ export class MapRenderer {
 
       const [sx, sy] = camera.toScreen(palm.x_px, palm.y_px);
 
-      if (showRosette && radiusOnScreen > 4) {
+      if (showMerge && radiusOnScreen > 4) {
         const r = Math.min(radiusOnScreen, 400);
         ctx.beginPath();
         ctx.arc(sx, sy, r, 0, Math.PI * 2);
@@ -265,8 +272,12 @@ export class MapRenderer {
         ctx.stroke();
       }
 
+      // Gated by its own switch. It never had one: the measured-rosette rings
+      // were drawn unconditionally whenever they were big enough on screen, so
+      // they appeared on top of the merge rings with no way to turn them off --
+      // and on a closed canopy they overlap neighbouring crowns by construction.
       const rosetteOnScreen = palm.rosette_px * camera.scale;
-      if (rosetteOnScreen >= 3.5) {
+      if (showRosette && rosetteOnScreen >= 3.5) {
         ctx.beginPath();
         ctx.arc(sx, sy, Math.min(rosetteOnScreen, 200), 0, Math.PI * 2);
         ctx.strokeStyle = palm.manual ? this.colors.info : 'rgba(110,231,168,0.8)';

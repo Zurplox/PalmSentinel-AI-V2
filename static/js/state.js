@@ -51,7 +51,10 @@ export const initialState = {
 
   // view preferences
   tool: 'polygon',
-  overlays: { palms: true, ids: false, exclusion: false, minimap: true, edges: true },
+  // exclusion = the merge radius (half the spacing floor, never touches a
+  // neighbour's centre); rosette = the crown/rosette radius measured per palm,
+  // which can overlap neighbours on a closed canopy. Separate on purpose.
+  overlays: { palms: true, ids: false, exclusion: false, rosette: false, minimap: true, edges: true },
 
   // run parameters
   blockName: 'Blok 1',
