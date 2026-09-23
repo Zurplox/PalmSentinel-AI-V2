@@ -2,7 +2,7 @@
 
 > **Living Engineering Document & Decision Record**
 > *Target Audience: Autonomous AI Agents and engineers taking over this project.*
-> *Last Updated: 2026-09-23 13:02:00 Local Time*
+> *Last Updated: 2026-09-23 13:12:00 Local Time*
 > *Active Workspace: `E:\Freebuff\Palm Sentinel (V2)`*
 > *Predecessor, read-only reference: `F:\PalmSentinel-AI` (log: `SYSTEM_LIVING_LOG.md`)*
 > *This log follows the predecessor's method exactly, under a different name.*
@@ -845,3 +845,59 @@ record the supersession.
     and no F: checkout.
   * **`F:\PalmSentinel-AI` remains unmodified**: `git status --porcelain` empty at
     HEAD `cd0c22e`, throughout this pass as in every pass before it.
+### [2026-09-23 13:12] — Two README claims corrected against measurement: what a fresh build yields, and the browser entry point
+
+* **Agent / Author**: Codebuff (Buffy)
+* **Files Modified**: `README.md`, `SYSTEM_LIVING_LOG_V2.md`
+* **Changes Made**:
+  * **The build-it-yourself sentence.** It previously read "Or build it yourself,
+    which produces the same thing" — which is not what happens. A fresh
+    `pyinstaller --noconfirm PalmSentinelV2.spec` produces the same *application*
+    but not the same *folder*: `PalmSentinelV2.exe` plus the `_internal/` bundle,
+    with templates, stylesheets and the demo orthomosaic inside it, and **no**
+    `data/` directory beside the executable. `data/` is the operator's imagery
+    library, and the first run creates it and seeds the bundled demo into it. The
+    v2.0.0 download contains that `data/` only because the build had been started
+    once before it was packaged. The README now says exactly this, and the
+    "Build the packaged version" section names what the folder holds, so the
+    section the sentence now links to is self-contained.
+  * **`app.py` documented.** It is the browser entry point for the whole
+    application — the port-5000 server every interface verification in this log
+    ran against — and it was referenced by nothing at all: not the README,
+    `requirements.txt`, the launchers or this log. It now has its own section with
+    the install and run steps, the banner it prints, and a row in the layout table.
+  * **Two measured caveats recorded rather than papered over.** The port is fixed
+    at 5000 with no flag to change it, and starting a second copy while one is
+    running does **not** report a conflict: the operating system permits both to
+    bind, so which process answers a request stops being under the operator's
+    control. Three instances of `python app.py` were observed bound to
+    `127.0.0.1:5000` at the same moment (pids 8628, 12032 and 17780). Documented
+    as a warning because the code was deliberately not changed in this pass.
+* **Verification**:
+  * **The documented steps were executed, not asserted.** From the checkout,
+    `python app.py` printed its banner (`image : demo_palm_estate.jpg 2,500x2,500 px
+    @ 4 cm/px`, `url : http://127.0.0.1:5000`) and then served: `GET /` -> 200,
+    19,755 bytes, `PalmSentinel` present; `GET /static/css/app.css` -> 200, 25,031
+    bytes; `GET /api/state` -> the demo loaded at 2500x2500 @ 4.0 cm/px;
+    `POST /api/census` -> 200, **140 palms, 140.0 SPH, 1.0 ha, band `optimal`**;
+    `POST /api/export/csv` -> 200, 10,568 bytes, **140 palm rows**. The browser path
+    produces the same numbers as the desktop window and the packaged build.
+  * **A fresh build was made to measure the first claim**, with
+    `--distpath`/`--workpath` redirected to a temporary directory so `dist/` and
+    the released artefact were left untouched. Built in 36 s. Before the first run
+    the folder held exactly `PalmSentinelV2.exe` and `_internal/`, and `data/` was
+    absent; `templates/`, `static/` and `data/demo_palm_estate.jpg`
+    (2,486,597 bytes) were all inside `_internal/`. After one `--selftest` run,
+    `data/` existed beside the executable with the demo seeded into it
+    (2,486,597 bytes) and the census reported 140 palms / 140.0 SPH:
+    `RESULT: PASS`.
+  * The earlier claim that the released zip's `data/` came from a pre-packaging run
+    is now evidenced by timestamps as well: the built executable is 12:26:55 and
+    the seeded demo is 12:29:08 in `dist/`.
+  * **Scope:** `README.md` changed by 39 insertions and 5 deletions. No code,
+    spec, launcher, test, manifest, release asset or repository setting was
+    touched. The two stray `python app.py` servers left running by earlier passes
+    were terminated (pids 8628 and 12032); the single instance started from the
+    documented command was left serving `127.0.0.1:5000`.
+  * **`F:\PalmSentinel-AI` remains unmodified and read-only**: `git status
+    --porcelain` empty at HEAD `cd0c22e`.

@@ -23,11 +23,14 @@ Full analysis, numbers and evidence: [`SYSTEM_LIVING_LOG_V2.md`](SYSTEM_LIVING_L
 so the first census works with nothing else installed. Windows SmartScreen may warn
 about an unknown publisher, because the build is not code-signed.
 
-Or build it yourself, which produces the same thing:
-
-```
-dist\PalmSentinelV2\PalmSentinelV2.exe
-```
+Or [build it yourself](#build-the-packaged-version). That produces the same
+application but not quite the same folder: a fresh build is only
+`PalmSentinelV2.exe` plus the `_internal\` bundle beside it, with no `data\`
+folder yet. `data\` is the imagery library, and the first run creates it next to
+the executable and copies the bundled demo into it, so the Library dialog has
+something to list. The v2.0.0 download above already contains that first-run
+`data\`, because the build was started once before it was packaged; a build of
+your own grows it on first use instead.
 
 **What this needs:** Windows 10 or 11, 64-bit, and the Microsoft Edge WebView2
 runtime. WebView2 ships with Windows 10/11 and with Microsoft Edge; if it has
@@ -62,14 +65,46 @@ whatever is missing instead of failing quietly. `PalmSentinel.exe` (compiled fro
 `Launcher.cs`) does the same and writes `launcher.log` next to itself, because a
 GUI process has no console to report to.
 
+### In a browser — needs Python, and no window
+
+The same application also serves itself as a plain local web server, using the
+same install as the desktop path:
+
+```
+pip install -r requirements.txt
+python app.py
+```
+
+It names the flight it has loaded and then serves the identical interface on
+<http://127.0.0.1:5000>:
+
+```
+  PalmSentinel V2
+  ----------------------------------------------------------
+  image   : demo_palm_estate.jpg 2,500x2,500 px @ 4 cm/px
+  url     : http://127.0.0.1:5000
+  data    : <checkout>\data
+  ----------------------------------------------------------
+  Local only. Imagery never leaves this computer.
+```
+
+The interface, the census, the numbers and the exports are the same ones the
+desktop window and the packaged build produce. Two things to know before you use
+it: the port is fixed at 5000 with no flag to change it, and starting a second
+copy while one is already running does **not** report a conflict — the operating
+system lets both bind 5000, so which process answers a request stops being
+something you control. Stop the running one first.
+
 ### Build the packaged version
 
 ```
 pyinstaller --noconfirm PalmSentinelV2.spec
 ```
 
-Produces `dist/PalmSentinelV2/`. `build/` and `dist/` are not tracked; the build
-is reproducible from the spec.
+Produces `dist/PalmSentinelV2/`, holding `PalmSentinelV2.exe` and the `_internal\`
+bundle. A `data\` library folder appears beside the executable the first time you
+run it. `build/` and `dist/` are not tracked; the build is reproducible from the
+spec.
 
 ## Verify it
 
@@ -138,6 +173,7 @@ why a self-referential audit could not see it.
 | `web/` | HTTP surface: `store.py` owns the loaded image, `views.py` owns the contracts. |
 | `templates/`, `static/` | The interface. No CSS framework; the design system is `static/css/app.css`. |
 | `desktop_app.py` | The desktop window, and the `--check` / `--selftest` entry points. |
+| `app.py` | Browser entry point: the same application served on `127.0.0.1:5000`, no window. |
 | `paths.py` | Where files live: read-only assets in the bundle, writable library beside the exe. |
 | `Launcher.cs`, `PalmSentinel.exe` | Source-checkout launcher with a dependency preflight; writes `launcher.log` because a GUI process has no console. |
 | `Launch_PalmSentinel.bat`, `.ps1` | The double-click entry points: prefer the packaged build, otherwise preflight Python and name whatever is missing. |
