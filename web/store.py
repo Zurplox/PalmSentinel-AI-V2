@@ -17,6 +17,7 @@ picture.
 
 from __future__ import annotations
 
+import hashlib
 import os
 import threading
 import time
@@ -62,6 +63,10 @@ class ImageInfo:
     preview_width: int
     preview_height: int
     gsd_cm_per_px: float
+    # Content fingerprint of the decoded image.  Raster URLs carry it so the
+    # browser cannot serve one image's cached pixels for another image whose
+    # URL is identical -- the preview URL, for one, never changes otherwise.
+    fingerprint: str = ""
 
     @property
     def scale_factor(self) -> float:
@@ -81,6 +86,7 @@ class ImageInfo:
             "preview_height": self.preview_height,
             "scale_factor": round(self.scale_factor, 6),
             "gsd_cm_per_px": self.gsd_cm_per_px,
+            "fingerprint": self.fingerprint,
             "m_per_px": round(frame.m_per_px, 6),
             "extent_m": [round(extent_w, 2), round(extent_h, 2)],
             "full_area_ha": round(frame.full_area_ha, 4),
@@ -167,6 +173,11 @@ class ImageStore:
             # A census belongs to the image it was run on; a new image
             # invalidates it rather than leaving a stale result exportable.
             self._last_census = None
+            # A thumbnail hash identifies the decoded content cheaply: 64x64
+            # is 12 kB, insensitive to resize rounding, and changes with any
+            # real change of imagery.
+            thumb = cv2.resize(preview, (64, 64), interpolation=cv2.INTER_AREA)
+            fingerprint = hashlib.sha256(thumb.tobytes()).hexdigest()[:12]
             self._info = ImageInfo(
                 path=resolved,
                 filename=os.path.basename(resolved),
@@ -175,6 +186,7 @@ class ImageStore:
                 preview_width=preview_w,
                 preview_height=preview_h,
                 gsd_cm_per_px=float(gsd_cm_per_px or self.default_gsd_cm),
+                fingerprint=fingerprint,
             )
             return self._info
 
@@ -187,6 +199,7 @@ class ImageStore:
             preview_width=info.preview_width,
             preview_height=info.preview_height,
             gsd_cm_per_px=float(gsd_cm_per_px),
+            fingerprint=info.fingerprint,
         )
 
     def set_gsd(self, gsd_cm_per_px: float) -> ImageInfo:

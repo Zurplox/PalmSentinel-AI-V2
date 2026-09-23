@@ -94,7 +94,7 @@ class Claim:
 
 def requested_port(argv: Sequence[str]) -> Optional[int]:
     """
-    Read ``--port N`` out of a command line, or return ``None``.
+    Read ``--port N`` or ``--port=N`` out of a command line, or return ``None``.
 
     One reader, so ``app.py`` and ``desktop_app.py`` cannot disagree about what
     the flag means or how it fails: every unusable value is refused the same way,
@@ -106,12 +106,28 @@ def requested_port(argv: Sequence[str]) -> Optional[int]:
     port, which is the opposite of what ``--port`` promises.  Without the flag the
     search behaviour is unchanged -- that is what claiming the base port upward is
     for.
+
+    Both spellings are read because the other one is what a command line habit
+    produces, and measured before this: ``app.py --port=5123`` was not recognised,
+    was therefore ignored, and the app served on the shared default port 5000 while
+    saying so -- the silent substitution this module exists to prevent.
     """
-    if "--port" not in argv:
+    tokens = list(argv)
+    raw: Optional[str] = None
+    for index, token in enumerate(tokens):
+        if token == "--port":
+            if index + 1 >= len(tokens):
+                raise SystemExit("[PalmSentinel] --port needs a number, e.g. --port 5001")
+            raw = tokens[index + 1]
+            break
+        if token.startswith("--port="):
+            raw = token[len("--port="):]
+            break
+    if raw is None:
         return None
     try:
-        value = int(argv[list(argv).index("--port") + 1])
-    except (IndexError, ValueError):
+        value = int(raw)
+    except ValueError:
         raise SystemExit("[PalmSentinel] --port needs a number, e.g. --port 5001")
     if not 1 <= value <= PORT_LIMIT:
         raise SystemExit(

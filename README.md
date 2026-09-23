@@ -17,9 +17,9 @@ Full analysis, numbers and evidence: [`SYSTEM_LIVING_LOG_V2.md`](SYSTEM_LIVING_L
 
 ### The packaged build — needs nothing installed
 
-**[Download the standalone Windows build (v2.0.3)](https://github.com/Zurplox/PalmSentinel-AI-V2/releases/latest)**
-— `PalmSentinelV2-win64.zip`, 85,447,363 bytes (~81 MB), sha256
-`6c69de1bca06d0d0230a9f1e1a0b7f7d5cc2b929f66e94ba1d3a051d7be2bc4b`. Unzip it anywhere and run
+**[Download the standalone Windows build (v2.0.4)](https://github.com/Zurplox/PalmSentinel-AI-V2/releases/latest)**
+— `PalmSentinelV2-win64.zip`, 82,923,834 bytes (~79 MB), sha256
+`b7ea85a52a7436c8d7c328bdfa154754deaf2d4f32e1a6b2e9a8e5f9b5ebb9ae`. Unzip it anywhere and run
 `PalmSentinelV2.exe` from inside; the bundled demo orthomosaic loads on first run,
 so the first census works with nothing else installed. Windows SmartScreen may warn
 about an unknown publisher, because the build is not code-signed.
@@ -109,8 +109,13 @@ PalmSentinelV2.exe --port 5123
 An explicit port is the port used, or the launch stops and says which port is in
 the way and how to change it. It is never silently swapped for a different one.
 A value that is not a usable port — `abc`, `0`, `70000` — is refused the same way,
-in a sentence naming the flag rather than a traceback from `bind`. In the packaged
-build, which has no console, a refusal is a dialog and waits to be dismissed.
+in a sentence naming the flag rather than a traceback from `bind`. `--port=5123` is
+read as well as `--port 5123`, because the other spelling is what command-line
+habit produces and silently ignoring it meant serving on 5000. Where a refusal is
+shown depends on where it can be seen: with a terminal or anything capturing output
+— a launcher, a script — it is printed and the process exits, with the exit code a
+script can test; in a windowed launch with nothing to print to, which is what a
+double-click gives, it is a dialog instead, and that waits to be dismissed.
 
 ### Build the packaged version
 
@@ -143,7 +148,7 @@ UI — it reads the rendered numbers back out of the page.
 Tests:
 
 ```
-python -m unittest discover -s tests     # 79 tests, ~60 s, no imagery or network needed
+python -m unittest discover -s tests     # 86 tests, ~60 s, no imagery or network needed
 python tests/ground_truth.py             # the true-versus-recovered tables, ~3.5 min
 ```
 

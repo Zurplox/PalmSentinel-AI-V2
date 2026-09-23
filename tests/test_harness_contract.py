@@ -35,6 +35,7 @@ window, for a machine with no display or no WebView2 runtime.
 from __future__ import annotations
 
 import difflib
+import io
 import os
 import re
 import subprocess
@@ -57,15 +58,14 @@ HARNESSES = {
 
 #: Generous: a loaded machine runs the census in seconds, and the window harness
 #: waits on a real webview.
-TIMEOUTS = {"check": 240, "selftest": 420, "window-selftest": 420}
+HARNESS_TIMEOUT = 420
 
 SKIP_WINDOW = "PALMSENTINEL_SKIP_WINDOW_TESTS"
 
 
 def normalize(text: str) -> str:
     """Collapse this machine's own text to placeholders, leaving the claims alone."""
-    for variant in (str(ROOT), ROOT.as_posix()):
-        text = re.sub(re.escape(variant), "<REPO>", text, flags=re.IGNORECASE)
+    text = re.sub(re.escape(str(ROOT)), "<REPO>", text, flags=re.IGNORECASE)
     text = re.sub(re.escape(sys.executable), "<PYTHON>", text, flags=re.IGNORECASE)
     text = re.sub(r"127\.0\.0\.1:\d+", "127.0.0.1:<PORT>", text)
     return re.sub(r"— port \d+", "— port <PORT>", text)
@@ -79,7 +79,7 @@ def run_harness(name: str) -> "tuple[int, str]":
         capture_output=True,
         text=True,
         encoding="utf-8",
-        timeout=TIMEOUTS[name],
+        timeout=HARNESS_TIMEOUT,
     )
     return completed.returncode, normalize(completed.stdout)
 
@@ -126,7 +126,7 @@ class TestHarnessTranscripts(unittest.TestCase):
                     capture_output=True,
                     text=True,
                     encoding="utf-8",
-                    timeout=TIMEOUTS["check"],
+                    timeout=HARNESS_TIMEOUT,
                 )
                 self.assertEqual(completed.returncode, 0, f"{alias} exited non-zero")
                 self.assertEqual(normalize(completed.stdout), expected)
@@ -159,15 +159,71 @@ class TestFlagVocabulary(unittest.TestCase):
 
         for module in (desktop_app, verification):
             for flag in sorted(declared):
-                self.assertIn(
-                    flag,
+                # Bounded on both sides, so `-v` cannot be satisfied by the `-v`
+                # inside `--version` -- which is exactly what the substring check
+                # this replaces could never fail for.
+                self.assertRegex(
                     module.__doc__ or "",
+                    rf"(?<![\w-]){re.escape(flag)}(?![\w-])",
                     f"{flag} is dispatched but not documented in {module.__name__}",
                 )
 
 
 class TestRefusalsAreVisible(unittest.TestCase):
     """A ``--port`` value that is not a port stops the launch, and says so."""
+
+    def test_with_somewhere_to_print_it_prints_and_does_not_dial(self) -> None:
+        # A dialog in a scripted launch is a hang: measured before this was fixed,
+        # `desktop_app.py --port 0` was still alive after 25 s with a modal box on
+        # screen, where `app.py --port 0` had exited 1 with the same sentence.
+        import desktop_app
+
+        stream = io.StringIO()
+        dialogs: "list[str]" = []
+        original_stream, original_dialog = desktop_app._output_stream, desktop_app._show_dialog
+        desktop_app._output_stream = lambda: stream
+        desktop_app._show_dialog = dialogs.append
+        try:
+            desktop_app._report_fatal("[PalmSentinel] 0 is not a usable port")
+        finally:
+            desktop_app._output_stream = original_stream
+            desktop_app._show_dialog = original_dialog
+
+        self.assertIn("not a usable port", stream.getvalue())
+        self.assertEqual(dialogs, [], "a refusal nobody can dismiss is a hang")
+
+    def test_with_nowhere_to_print_it_shows_a_dialog(self) -> None:
+        # The double-clicked build: no console and nothing redirected, so a print
+        # goes nowhere and the message would be invisible.
+        import desktop_app
+
+        dialogs: "list[str]" = []
+        original_stream, original_dialog = desktop_app._output_stream, desktop_app._show_dialog
+        desktop_app._output_stream = lambda: None
+        desktop_app._show_dialog = dialogs.append
+        try:
+            desktop_app._report_fatal("[PalmSentinel] 0 is not a usable port")
+        finally:
+            desktop_app._output_stream = original_stream
+            desktop_app._show_dialog = original_dialog
+
+        self.assertEqual(dialogs, ["[PalmSentinel] 0 is not a usable port"])
+
+    def test_a_bad_port_stops_the_desktop_entry_instead_of_waiting(self) -> None:
+        # The defect this pins, measured through the real entry point: the process
+        # used to print the sentence and then sit on a modal box -- alive at 25 s,
+        # which is a hang to anything scripted.  Streams are what a terminal, a
+        # launcher or a capture gives it, and with them it must stop.
+        completed = subprocess.run(
+            [sys.executable, str(ROOT / "desktop_app.py"), "--port", "0"],
+            cwd=str(ROOT),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=90,
+        )
+        self.assertEqual(completed.returncode, 1)
+        self.assertIn("not a usable port", completed.stdout + completed.stderr)
 
     def test_an_unusable_port_stops_the_launch_and_is_surfaced(self) -> None:
         import desktop_app
@@ -224,18 +280,7 @@ def regenerate() -> int:
             print(f"{name}: unchanged (ran with exit {code})")
             continue
         path.write_text(transcript, encoding="utf-8", newline="\n")
-        print(f"{name}: rewritten from a run that exited {code}")
-        print(
-            "".join(
-                difflib.unified_diff(
-                    before.splitlines(keepends=True),
-                    transcript.splitlines(keepends=True),
-                    fromfile="before",
-                    tofile="after",
-                )
-            )
-            or "  (new file)"
-        )
+        print(f"{name}: rewritten from a run that exited {code} -- review with git diff")
     return 0
 
 

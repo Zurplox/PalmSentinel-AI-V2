@@ -12,6 +12,7 @@ the client reads) so a rename on either side fails the suite.
 
 from __future__ import annotations
 
+import os
 import pathlib
 import re
 import unittest
@@ -187,6 +188,84 @@ class TestCensusPayloadContract(unittest.TestCase):
             self.assertAlmostEqual(row["y_px"], palm.y_px, places=2)
             self.assertAlmostEqual(row["x_m"], palm.x_m, places=3)
             self.assertAlmostEqual(row["y_m"], palm.y_m, places=3)
+
+
+class TestRasterIdentityContract(unittest.TestCase):
+    """
+    The browser cannot be allowed to show one image's cached pixels for another.
+
+    ``/api/preview`` is one URL for the whole session and is HTTP-cached for a
+    day, so after any import the renderer could fetch the *previous* image's
+    raster from the browser cache and paint it into the new image's (correct)
+    extent -- the demo, being smaller than the preview cap, never exposed it;
+    a real 100+ MP orthomosaic always did.  The fix keys every per-image URL by
+    a content fingerprint the payload reports.  These tests keep both halves
+    joined: the store must report one, and the client must carry it.
+    """
+
+    def _store_with(self, name, bgr):
+        import os
+        import shutil
+        import tempfile
+
+        import cv2
+
+        tmp = tempfile.mkdtemp(prefix="psv2-store-")
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        path = os.path.join(tmp, name)
+        cv2.imwrite(path, bgr)
+        return path
+
+    def test_distinct_images_report_distinct_fingerprints(self):
+        import numpy as np
+
+        from web.store import ImageStore
+
+        red = self._store_with("red.jpg", np.full((64, 64, 3), (0, 0, 255), np.uint8))
+        blue = self._store_with("blue.jpg", np.full((64, 64, 3), (255, 0, 0), np.uint8))
+        store = ImageStore(os.path.dirname(red))
+        first = store.load(red)
+        second = store.load(blue)
+        self.assertTrue(first.fingerprint)
+        self.assertTrue(second.fingerprint)
+        self.assertNotEqual(first.fingerprint, second.fingerprint)
+        # ...and both reach the payload the client reads.
+        self.assertIn("fingerprint", first.to_dict())
+
+    def test_fingerprint_survives_a_gsd_change(self):
+        """set_gsd rebuilds ImageInfo; a dropped fingerprint would resurrect the bug."""
+        import numpy as np
+
+        from web.store import ImageStore
+
+        red = self._store_with("red.jpg", np.full((64, 64, 3), (0, 0, 255), np.uint8))
+        store = ImageStore(os.path.dirname(red))
+        info = store.load(red)
+        reinfo = store.set_gsd(9.0)
+        self.assertEqual(info.fingerprint, reinfo.fingerprint)
+
+    def test_the_client_keys_raster_urls_by_the_reported_fingerprint(self):
+        api_js = (JS_DIR / "api.js").read_text(encoding="utf-8")
+        render_js = (JS_DIR / "render.js").read_text(encoding="utf-8")
+
+        def builder_source(name):
+            """The body of one URL builder, so a drift in one cannot hide behind the others."""
+            start = api_js.index(f"{name}(")
+            end = api_js.index("},", start)
+            return api_js[start:end]
+
+        # Each per-image URL construction carries the key...
+        for name in ("cropUrl", "sampleUrl", "previewUrl"):
+            self.assertIn("fingerprint", builder_source(name), f"{name} stopped keying its URL by fingerprint")
+        # ...all three load paths capture it...
+        self.assertEqual(
+            3,
+            len(re.findall(r"fingerprint = body\.image\?\.fingerprint", api_js)),
+            "state/loadFile/loadPath must all adopt the reported fingerprint",
+        )
+        # ...and the renderer asks for the keyed preview, not the bare URL.
+        self.assertNotIn("loadImage('/api/preview')", render_js)
+        self.assertIn("api.previewUrl()", render_js)
 
 
 if __name__ == "__main__":

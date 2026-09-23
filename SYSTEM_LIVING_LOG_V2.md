@@ -2,7 +2,7 @@
 
 > **Living Engineering Document & Decision Record**
 > *Target Audience: Autonomous AI Agents and engineers taking over this project.*
-> *Last Updated: 2026-09-23 15:22:00 Local Time*
+> *Last Updated: 2026-09-23 21:40:13 Local Time*
 > *Active Workspace: `E:\Freebuff\Palm Sentinel (V2)`*
 > *Predecessor, read-only reference: `F:\PalmSentinel-AI` (log: `SYSTEM_LIVING_LOG.md`)*
 > *This log follows the predecessor's method exactly, under a different name.*
@@ -410,7 +410,7 @@ band edge — which is what pinned V1's results.
 ```powershell
 cd "E:\Freebuff\Palm Sentinel (V2)"
 
-# 1. Unit + invariant suite (79 tests)
+# 1. Unit + invariant suite (86 tests)
 python -m unittest discover -s tests -v
 
 # 1b. What the three harness flags print, against committed evidence (~11 s)
@@ -1257,3 +1257,69 @@ The second copy, in the previous pass's `psv2-standalone` directory beside `laun
 * **Release `v2.0.3`** -- `PalmSentinelV2-win64.zip`, **85,447,363 bytes**, sha256 `6c69de1bca06d0d0230a9f1e1a0b7f7d5cc2b929f66e94ba1d3a051d7be2bc4b`, from `rm -rf build dist` + `pyinstaller --noconfirm --clean PalmSentinelV2.spec` (37 s), zipped **before** the built app was ever run (264 entries, top-level `PalmSentinelV2/`, no `data/`), asset name confirmed on the API rather than assumed -- the mis-naming of the previous pass did not recur -- `/releases/latest` resolving to it, with `v2.0.0`, `v2.0.1` and `v2.0.2` left in place.
 
 **One thing deliberately not done.** A refusal on the desktop path now waits for its dialog, which is right for a double-click and wrong for a scripted launch that would rather read an exit code. Making the dialog conditional on whether a console is attached is a small change, but it moves the same behaviour a third time; it is recorded here as the next candidate rather than guessed at now.
+
+### [2026-09-23 16:05] — Adversarial pass on the refusal surface: the dialog that waited, and the flag spelling that was ignored
+
+**Agent/Author:** Buffy (Freebuff). Pass requested by the owner: *"Adversarially exercise the change through its real entry points. Look for concrete boundary, empty-input, ordering, async, cleanup, and state-synchronization failures that the request makes relevant. Fix defects you can substantiate from the code or focused tests; do not harden unrelated or imaginary cases. Once correctness is established, remove any complexity introduced for risks that are not real. Finish with proportionate validation."*
+
+**Defect 1, substantiated through the entry point: a bad `--port` made the desktop entry wait instead of stopping.** Measured before the change: `desktop_app.py --port 0` printed the sentence and then sat on a visible modal box (`#32770`, titled `PalmSentinel V2`), alive at 12 s and killed at 25 s -- while the same value through `app.py` exited 1 with the same sentence. So "both paths refuse the same way" held for the value and not for the entry point, and a scripted launch hung with no timeout. The previous pass recorded the dialog as intended and attributed it in the README to the packaged build having no console; both were wrong in the same way.
+
+The fix is a discriminator that answers the right question. Not "is a console attached": measured, `GetConsoleWindow()` is **0 even for a python launched from bash**, so that test would have kept the hang. The question is whether the refusal can reach anyone -- `_output_stream()` returns the first of `sys.stderr`/`sys.stdout` that is not `None`, not closed, and has a real file descriptor; `_report_fatal` prints when there is one and calls `_show_dialog` only when there is not. A terminal, a launcher and a capture all have descriptors; a windowed build started from Explorer has a placeholder with none.
+
+Verified on the rebuilt binary: launched with pipes it **exits 1 in 1.1 s** with the sentence on stderr, and launched with no handles at all -- the double-click case, via `Start-Process` -- the **dialog still appears**. The visibility property survived, the hang is gone, and the branch that exists for a double-click was checked rather than assumed.
+
+**Defect 2, a boundary of the same flag: `--port=5123` was silently ignored.** Measured: `app.py --port=5123` served on **5000** and announced 5000. A silently substituted port is the exact failure this module exists to prevent, and the `=` spelling is what command-line habit produces. `ports.requested_port` now reads both spellings, and `--port=`, `--port=0`, `--port=70000`, `--port=http` refuse exactly as the space-separated forms do.
+
+**Complexity removed, because the risks it covered were not real.**
+
+* `TIMEOUTS` (three values, differing only in whether a webview is waited on) -> one `HARNESS_TIMEOUT`.
+* `regenerate()`'s unified-diff printer -> one line naming `git diff`, which shows the same thing now that the goldens are tracked.
+* `normalize()`'s second path variant (`as_posix`) -> dead on every platform: the posix form *is* `str(ROOT)` on posix, and Windows transcripts carry backslashes.
+* The vocabulary test's docstring check used `assertIn`, so `-v` was satisfied by the `-v` inside `--version` and it could not fail for the reason it claimed. Now bounded on both sides: `(?<![\w-])flag(?![\w-])`.
+* `.gitignore`'s six-line note on the `%SystemDrive%` rule -> two.
+
+Kept deliberately: the direct-run `sys.path` shim (a measured `ModuleNotFoundError` without it, and the module's own docstring documents that invocation) and the mutation-tested transcript comparisons.
+
+**Tests added, 79 -> 83.** Three in the contract module: a refusal with a stream prints and does **not** dial; a refusal with nothing to print to **does** dial; and a bad `--port` through the real desktop entry must exit 1 inside a 90 s bound, which is the test that would have failed on the previous behaviour. One in `test_ports.py` for the `=` spelling and its refusals. A third branch test -- "this process has a stream" -- was written and then removed: it would have depended on the test runner's stream plumbing rather than on our contract, which is the kind of check that fails for reasons that are not the code's.
+
+**Superseded decision, recorded rather than rewritten.** The 15:22 entry decided the dialog was how the desktop path refuses; this entry supersedes the *unconditional* half of it. The dialog is now only for a launch with nowhere to print, which is what the README's corrected paragraph says.
+
+**Files modified:** `desktop_app.py` (`_output_stream`, `_show_dialog`, `_report_fatal`), `ports.py` (both spellings in `requested_port`), `tests/test_harness_contract.py` (three tests added, four pieces of scaffolding removed, one strengthened), `tests/test_ports.py` (the `=` spelling), `.gitignore` (comment trimmed), `README.md` (the refusal paragraph corrected, the suite count), this log.
+
+**Not modified:** `Launcher.cs` and `PalmSentinel.exe`, the pipeline, detection and tiling code, the web layer, templates, stylesheets, client scripts, every threshold, the goldens (no transcript changed), `PalmSentinelV2.spec`, the release assets. `F:\PalmSentinel-AI` untouched.
+
+**Verification.**
+
+* `python -m unittest discover -s tests` -> **83 tests, OK, 60 s**; the contract module alone is 10 tests in 10.6 s, `test_ports.py` is 18.
+* `python tests/test_harness_contract.py --regenerate` reports all three transcripts **unchanged** -- the refusals are not part of any transcript, so the committed evidence still matches byte for byte.
+* The fixed code rebuilt into a temporary `--distpath` (leaving `dist/` as it was) passes `--check`, `--selftest` and `--selftest --window` with output **byte-identical to the v2.0.2 packaged transcripts** modulo the install path.
+* Entry-point probes, all cleared afterwards (no listeners, no processes): `app.py --port=5123` serves **5123**; two instances still take 5000 and 5001; a pinned taken port still exits 1; `--port 0` from a terminal exits 1 immediately; the double-click equivalent still dials.
+* The `%SystemDrive%` directory appeared a **third** time during this pass and was removed. Three controlled experiments deleted it first and then did exactly one thing: a `pyinstaller` build from the project root, the full test suite, and the packaged `--check` from the project root. **None reproduced it**, so the record stays "observed repeatedly, never reproduced on demand" and the ignore rule is what keeps it out of the repository.
+
+**Not committed, not released -- stated plainly because it matters.** The changes above are in the working tree only: no commit, no push, and the published `v2.0.3` therefore predates this entry and still carries the waiting dialog and the ignored `--port=`. Refreshing the release is a separate action, for whenever the owner asks for it.
+
+### [2026-09-23 21:38] — An imported orthomosaic painted the previous image's pixels: every raster URL now carries a content fingerprint
+
+**Agent/Author:** Buffy (Freebuff). Pass requested by the owner: *"I can't import in my image, when I imported it in, it only shows a small portion of my image, try it and see. If yes, fix it."* — folded into the outstanding publish pass ("commit as one clear unit, push, confirm remote").
+
+**What was substantiated, and how.** The report said "shows a small portion". Probing the running app through a browser showed the *extent* was never wrong: after importing a 12,000×9,000 synthetic image through the real file input, the drawn rectangle matched the expected fit to the full frame almost exactly. What was wrong was the *content* — the canvas showed the **demo's canopy** inside that rectangle, not the imported image. Server-side was cleared first, with a coordinate-encoded 300 MP orthomosaic (blue channel encodes x, green encodes y, so any view can be read back as coordinates): full decode 20,000×15,000, preview and every crop/sample verified to ±3 grey levels across 24 samples each, no reference image needed. The defect was client-side and had two halves:
+
+1. **Stale preview across an import.** The renderer's first raster is `/api/preview` — one URL for the whole session, HTTP-cached **24 h** (`web/views.py:_jpgs`, `cache_seconds=86400` on the preview route). After an import the browser fetched the *previous* image's raster from cache and painted it into the new image's extent. The demo can never expose this — at 2500×2500 it is smaller than the 4096 preview cap, so its preview URL serves identical bytes for any image of that size; only an import larger than the cap does.
+2. **The same hole in crops and loupe samples.** `/api/crop` and `/api/sample` are cached 1 h on image-independent URLs, so switching images via the Library dialog could serve one image's cached crop for another. One fix covers all three.
+3. **Two client races on the same boundary.** `MapRenderer.setImage` cleared `preview`/`native` but not `this.cache`, so old-image crops survived; and an in-flight crop from the previous image could repopulate `this.native` *after* the clear, with no new request ever replacing it at fit zoom — the old image, visible, forever. Fixed with a generation tag: requests are stamped, stale results dropped in `#fetchNative`, cache cleared on every image change.
+
+**The fix, at the one owner of image identity.** `ImageInfo` carries a `fingerprint` — sha256 of the 64×64 downscaled preview, computed once per decode (insensitive to resize rounding, changes with any real imagery change), preserved by `_reinstate_gsd` so a GSD change cannot resurrect the bug. It is reported in the state payload. Client-side, `api.js` holds the module-level fingerprint, captured by **all three load paths** (`state`, `loadFile`, `loadPath`); `cropUrl`, `sampleUrl` and the new `previewUrl()` key their URLs by it, so the browser cannot conflate two images' rasters. `render.js` now asks for `api.previewUrl()`.
+
+**Proven in the running UI, both directions.** Import path: upload → client fetched `/api/preview?fp=<new>` (seen in the network log); canvas pixels at image centre matched the synthetic gradient's predicted composite (predicted (0, 45, 83) with the 35% green overlay, measured (1, 47, 81)); extent correct. Library path: switching back to the demo, the canvas was verified against the *active image's own* preview bitmap — mean |Δ| 16.6 per channel over 25 samples, which is JPEG+resample noise, not a different image. One probe along the way read an empty canvas and one verdict threshold was miscalibrated; both were my probes' faults, caught by their own sanity checks, and re-run properly.
+
+**Regression cover, proven to bite.** `TestRasterIdentityContract` in `tests/test_ui_contract.py` (its exact remit: bugs that pass Python-only tests because nothing joins the two sides): distinct images report distinct fingerprints; the fingerprint survives `set_gsd`; and the client contract — each URL builder checked *individually* (a first version checked "fingerprint appears somewhere", which a mutation survived; the per-builder check catches one drifted builder), all three load paths adopt the payload value, the renderer asks for the keyed preview. Mutation-tested: breaking `cropUrl`'s key fails the suite; restored, green.
+
+**Release v2.0.4.** Clean `rm -rf build dist` → `pyinstaller --clean --noconfirm` → zipped **before any exe run**, 264 entries, **82,923,834 bytes**, sha256 `b7ea85a52a7436c8d7c328bdfa154754deaf2d4f32e1a6b2e9a8e5f9b5ebb9ae`. Verified from the extracted archive with `PATH=C:\Windows\System32;C:\Windows` (no Python): `--check` OK, `--selftest` PASS with the unchanged figures — **140 palms / 140.0 SPH / 1.0000 ha, band optimal, closest pair 169.532 px vs 168.75 px, csv 10,568 · geojson 54,288 · annotated 3,006,439 bytes** — and `--selftest --window` PASS, page-rendered 140.0 SPH and CSV from the page itself. The packaged build carries the fix (fingerprint code present in its `api.js`). README updated to v2.0.4 with the new size and digest.
+
+**Files modified:** `web/store.py` (fingerprint on `ImageInfo`, computed in `load`, preserved in `_reinstate_gsd`, reported in `to_dict`), `static/js/api.js` (fingerprint capture in the three load paths, keyed `cropUrl`/`sampleUrl`, new `previewUrl`), `static/js/render.js` (keyed preview, generation tag, cache cleared on image change), `tests/test_ui_contract.py` (`TestRasterIdentityContract`, 3 tests), `README.md` (release line, suite count), this log; suite count in §11.
+
+**Not modified:** the pipeline, detection and tiling code, every threshold, `desktop_app.py`, `ports.py`, `Launcher.cs`, the goldens (no transcript changed — the self-tests never fetch rasters by URL), `web/views.py` (the cache header stays; the URLs now identify the image). `F:\PalmSentinel-AI` untouched.
+
+**Verification.** `python -m unittest discover -s tests` → **86 tests, OK, 61 s** (was 83). Live UI probes as above on `python app.py --port 5177` with a sandbox data dir; all processes and listeners cleared afterwards. The standalone dev-server defect the owner reported is fixed; if they see any remaining wrong-size behaviour on *their* image, the extent path was measured correct end-to-end and the remaining suspect would be the image itself, not the app.
+
+**Also in this pass — the publish the owner requested.** All outstanding thread work (the refusal surface from 16:05, this fix) committed as one unit to `main` and pushed to `origin` (`https://github.com/Zurplox/PalmSentinel-AI-V2`), release `v2.0.4` published with the new asset, digest verified after upload. An untracked `docs/` landing site appeared in the tree — not this thread's work, left untracked and unjudged.

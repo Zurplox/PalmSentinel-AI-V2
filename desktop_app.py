@@ -177,16 +177,25 @@ def disable_page_zoom(webview) -> None:
         print(f"[PalmSentinel] WebView2 zoom patch unavailable: {exc}")
 
 
-def _report_fatal(message: str) -> None:
+def _output_stream():
     """
-    Say something that stopped the launch, where a double-click can see it.
+    A stream that really goes somewhere, or ``None`` if this launch has none.
 
-    A windowed process started from Explorer has no console, so anything on
-    stderr goes nowhere.  That is the same reason the launcher writes
-    ``launcher.log`` and shows a dialog instead of printing: a failure the user
-    cannot see is a failure they will report as "it does nothing".
+    The descriptor is what distinguishes a terminal, a launcher or a script
+    capturing output from a windowed build started from Explorer, which has
+    nothing to write to however stream-like its placeholder looks.
     """
-    print(message, file=sys.stderr)
+    for stream in (sys.stderr, sys.stdout):
+        try:
+            if stream is not None and not stream.closed and stream.fileno() >= 0:
+                return stream
+        except Exception:  # a sink with no descriptor, or one that cannot be asked
+            continue
+    return None
+
+
+def _show_dialog(message: str) -> None:
+    """The last resort: a modal box, for a launch with no stream to print to."""
     if sys.platform != "win32":
         return
     try:
@@ -195,6 +204,29 @@ def _report_fatal(message: str) -> None:
         ctypes.windll.user32.MessageBoxW(None, message, WINDOW_TITLE, 0x10)
     except Exception:  # pragma: no cover - platform dependent
         pass
+
+
+def _report_fatal(message: str) -> None:
+    """
+    Say something that stopped the launch, where a person or a script will see it.
+
+    A windowed process started from Explorer has no console and nothing
+    redirected, so a print goes nowhere: that is the case the dialog is for, and
+    the same reason the launcher writes ``launcher.log`` rather than trusting a
+    console that is not there.
+
+    Everywhere else -- a terminal, a launcher, a script capturing output -- the
+    message is printed and the process stops.  Measured before this was fixed:
+    ``desktop_app.py --port 0`` printed the sentence and then waited on a dialog
+    for as long as anyone left it open, where the same value through ``app.py``
+    had exited 1.  A modal box in a scripted launch is not a message, it is a
+    hang.
+    """
+    sink = _output_stream()
+    if sink is None:
+        _show_dialog(message)
+        return
+    print(message, file=sink)
 
 
 def claim_port(argv: list[str]) -> ports.Claim:

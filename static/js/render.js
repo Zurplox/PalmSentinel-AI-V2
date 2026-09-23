@@ -60,6 +60,9 @@ export class MapRenderer {
     this.exclusionRadiusPx = 0;
     this.cache = [];
     this.inFlight = false;
+    // Bumped on every image change; results of raster requests queued for an
+    // older generation are discarded rather than painted over the new image.
+    this.generation = 0;
   }
 
   /** A new orthomosaic invalidates every derived raster view. */
@@ -69,8 +72,10 @@ export class MapRenderer {
     this.native = null;
     this.nativeRequest = null;
     this.minimapPreview = null;
+    this.cache = [];
+    this.generation += 1;
     if (!info) return;
-    const image = await loadImage('/api/preview');
+    const image = await loadImage(api.previewUrl());
     if (this.image !== info) return;
     this.preview = image;
     this.minimapPreview = image;
@@ -119,7 +124,7 @@ export class MapRenderer {
       (rect.y1 - rect.y0) * camera.scale,
     );
     const maxDim = Math.max(256, Math.min(NATIVE_MAX_DIM, Math.ceil(screenSide)));
-    this.nativeRequest = { key, rect, maxDim };
+    this.nativeRequest = { key, rect, maxDim, generation: this.generation };
     this.#fetchNative();
   }
 
@@ -130,6 +135,9 @@ export class MapRenderer {
       const request = this.nativeRequest;
       this.nativeRequest = null;
       const image = await loadImage(api.cropUrl(request.rect, request.maxDim));
+      // The image changed while this was in flight: drop the result and keep
+      // draining, since the queue may now hold a request for the new image.
+      if (request.generation !== this.generation) continue;
       if (!image) break;
       this.native = { ...request, image };
       this.cache = this.cache.concat(this.native).slice(-NATIVE_CACHE_LIMIT);

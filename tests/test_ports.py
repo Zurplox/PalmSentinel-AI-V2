@@ -79,6 +79,18 @@ class TestRequestedPort(unittest.TestCase):
         self.assertEqual(ports.requested_port(["--port", "1"]), 1)
         self.assertEqual(ports.requested_port(["--port", str(ports.PORT_LIMIT)]), ports.PORT_LIMIT)
 
+    def test_the_equals_spelling_is_read_too(self) -> None:
+        # Measured before this existed: `app.py --port=5123` was not recognised,
+        # so it was ignored and the app served on the shared default port 5000
+        # while announcing 5000 -- a silent substitution by the flag whose whole
+        # purpose is to prevent one.
+        self.assertEqual(ports.requested_port(["--port=5123"]), 5123)
+        self.assertEqual(ports.requested_port(["--selftest", "--window", "--port=5124"]), 5124)
+        for value in ("", "http", "0", "70000"):
+            with self.subTest(value=value):
+                with self.assertRaises(SystemExit):
+                    ports.requested_port([f"--port={value}"])
+
 
 class TestClaim(unittest.TestCase):
     def setUp(self) -> None:

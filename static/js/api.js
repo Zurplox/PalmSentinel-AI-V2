@@ -87,8 +87,18 @@ export function saveBlob(blob, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
 
+// The fingerprint of the image whose rasters may be fetched.  Every per-image
+// URL carries it so the browser cannot serve one image's cached pixels for
+// another: /api/preview in particular is one URL for the whole session with a
+// 24-hour cache, identical for every image without this.
+let fingerprint = '';
+
 export const api = {
-  state: () => getJson('/api/state'),
+  async state() {
+    const body = await getJson('/api/state');
+    fingerprint = body.image?.fingerprint || '';
+    return body;
+  },
   images: () => getJson('/api/images'),
   gsd: (gsdCm) => postJson('/api/gsd', { gsd_cm: gsdCm }),
   census: (payload, options) => postJson('/api/census', payload, options),
@@ -96,7 +106,9 @@ export const api = {
 
   /** Load by server-side path, or by uploading a File. */
   async loadPath(path, gsdCm) {
-    return postJson('/api/image', { path, gsd_cm: gsdCm });
+    const body = await postJson('/api/image', { path, gsd_cm: gsdCm });
+    fingerprint = body.image?.fingerprint || '';
+    return body;
   },
   async loadFile(file, gsdCm) {
     const form = new FormData();
@@ -104,7 +116,9 @@ export const api = {
     if (gsdCm) form.append('gsd_cm', String(gsdCm));
     const response = await fetch('/api/image', { method: 'POST', body: form });
     if (!response.ok) throw new ApiError(await messageOf(response), response.status);
-    return response.json();
+    const body = await response.json();
+    fingerprint = body.image?.fingerprint || '';
+    return body;
   },
 
   exportCsv: (block) => postForBlob('/api/export/csv', { block }),
@@ -118,6 +132,7 @@ export const api = {
       x2: rect.x1.toFixed(1),
       y2: rect.y1.toFixed(1),
       max_dim: String(Math.round(maxDim)),
+      fp: fingerprint,
     });
     return `/api/crop?${params}`;
   },
@@ -127,8 +142,14 @@ export const api = {
       x: x.toFixed(1),
       y: y.toFixed(1),
       size: String(Math.round(size)),
+      fp: fingerprint,
     });
     return `/api/sample?${params}`;
+  },
+
+  /** The preview URL of the current image; keyed by fingerprint. */
+  previewUrl() {
+    return `/api/preview?fp=${fingerprint}`;
   },
 };
 
