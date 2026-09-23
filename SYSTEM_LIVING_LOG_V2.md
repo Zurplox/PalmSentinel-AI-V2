@@ -2,7 +2,7 @@
 
 > **Living Engineering Document & Decision Record**
 > *Target Audience: Autonomous AI Agents and engineers taking over this project.*
-> *Last Updated: 2026-09-23 13:12:00 Local Time*
+> *Last Updated: 2026-09-23 13:17:00 Local Time*
 > *Active Workspace: `E:\Freebuff\Palm Sentinel (V2)`*
 > *Predecessor, read-only reference: `F:\PalmSentinel-AI` (log: `SYSTEM_LIVING_LOG.md`)*
 > *This log follows the predecessor's method exactly, under a different name.*
@@ -899,5 +899,103 @@ record the supersession.
     touched. The two stray `python app.py` servers left running by earlier passes
     were terminated (pids 8628 and 12032); the single instance started from the
     documented command was left serving `127.0.0.1:5000`.
+  * **`F:\PalmSentinel-AI` remains unmodified and read-only**: `git status
+    --porcelain` empty at HEAD `cd0c22e`.
+### [2026-09-23 13:17] — Two instances could share one port; the port is now claimed, and a second launch is deterministic
+
+* **Agent / Author**: Codebuff (Buffy)
+* **Files Modified**:
+  `ports.py` *(new)*, `app.py`, `desktop_app.py`, `tests/test_ports.py` *(new)*,
+  `README.md`, `SYSTEM_LIVING_LOG_V2.md`
+* **Changes Made**:
+  * **The defect, and its mechanism.** On Windows the `SO_REUSEADDR` option does
+    not mean "reuse a port left in TIME_WAIT" the way it does on Unix — it means a
+    *second* socket may bind a port another socket is already listening on. Both
+    servers V2 can start inherit `allow_reuse_address = True` from
+    `http.server.HTTPServer` (Werkzeug's, behind `app.py`, and the `wsgiref` server
+    pywebview runs for the desktop window), so both set it. Three instances were
+    observed listening on `127.0.0.1:5000` simultaneously, each reporting success,
+    with no way to tell which one would answer a given request. Measured directly:
+    a plain bind against the running server fails with 10048, "only one usage of
+    each socket address" — which is what made a reliable probe possible.
+  * **`ports.py` — one owner of the port.** The rule is the one an operator can
+    predict: the default is 5000, and if it is taken the next free port is used and
+    the port that was taken is **named**; an explicit `--port N` is honoured
+    exactly, or the launch stops and says which port is in the way and how to
+    change it, because a pinned port that silently becomes a different one is
+    worse than a refusal. A port is claimed by an **atomic lock file**
+    (`O_CREAT|O_EXCL`) before it is used and then confirmed with a real plain
+    bind, so two instances starting in the same instant cannot both take one, and a
+    port held by something that is not PalmSentinel is passed over too. Freshness
+    needs no process-id guessing: while a live process holds the lock open Windows
+    refuses to let anyone delete it, and once that process is gone the deletion
+    succeeds — verified from a second process both ways — so a hard kill cannot
+    leave a port permanently out of service.
+  * **`app.py` gained `--port`** (it had none, which is why the port was
+    described as fixed) and both entry points now read the flag through one
+    function, `ports.requested_port`, so the two cannot disagree about what it
+    means or how it fails.
+  * **The desktop build says which port it took, in its title.** A windowed launch
+    from Explorer has no console, so stdout goes nowhere: the window is titled
+    `PalmSentinel V2 — port 5001` when it is not on 5000. A launch that has to
+    *refuse* an explicitly requested port shows a native message box for the same
+    reason — the same reasoning that makes `Launcher.cs` write `launcher.log` and
+    show a dialog.
+  * **`README.md`** now documents the rule for both entry points under "Launching
+    it twice", replaces the old note that said the port could not be changed and
+    that a second copy silently shared it, points at v2.0.1 and states the new
+    download size.
+* **Verification**:
+  * **Launched twice, quoting the second instance.** `python app.py` then
+    `python app.py` again:
+    ```
+    instance 1:  url     : http://127.0.0.1:5000
+    instance 2:  url     : http://127.0.0.1:5001
+                 port 5000 is already in use; serving on http://127.0.0.1:5001 instead
+    listeners:   127.0.0.1:5000  pid 10724
+                 127.0.0.1:5001  pid 15920
+    ```
+    Both then served independently and identically:
+    `port 5000: census 140 palms / 140.0 SPH / 1.0 ha / optimal; csv 200 10568
+    bytes 140 rows` and the same on 5001.
+  * **Explicit ports are refused, not moved.** With both ports held:
+    `python app.py --port 5000` -> `[PalmSentinel] port 5000 is already in use.
+    Start with a different one, for example: --port 5001`, exit 1; and
+    `--port 5001` -> the same message naming `--port 5002`, exit 1. No third
+    listener appeared.
+  * **Two launched in the same instant** (the double-click case, which a probe
+    alone cannot handle): one took 5000 and the other 5001, two processes, two
+    ports, each answering `140 palms / 140.0 SPH`.
+  * **The packaged build, from the extracted release zip**, with no Python on
+    `PATH`: instance 1 titled `PalmSentinel V2` on 5000 (pid 6352), instance 2
+    titled `PalmSentinel V2 - port 5001` on 5001 (pid 2784) — two ports, two
+    processes, both censusing 140 palms / 140.0 SPH / 1.0 ha / `optimal`. A third
+    launch with `--port 5000` opened **no window and no third listener**; it raised
+    a modal dialog titled `PalmSentinel V2` and its stderr carried the refusal
+    naming 5000 and `--port 5001`.
+  * **Single-instance behaviour is untouched.** The packaged build still passes
+    `--check` (exit 0) and `--selftest` (`RESULT: PASS -- 140 palms / 140.0 SPH
+    matched the dev path; four exports produced output`), and a live single
+    instance returns `POST /api/census -> 200, 140 palms, 140.0 SPH, 1.0 ha, band
+    optimal` with exports at the same byte counts as every previous pass
+    (csv 10568, geojson 54288, annotated 3006439).
+  * **`python -m unittest discover -s tests` -> 58 tests, OK** (15 new). The new
+    tests are load-bearing, checked by mutation: removing the lock arbitration
+    fails two of them; probing with `SO_REUSEADDR` — the defect's own mechanism —
+    fails three, including `PortUnavailable not raised`, which is the
+    silent-share failure mode. That second mutation initially **escaped**, and the
+    reason is recorded because it was a flaw in the test rather than the code: the
+    test held the port with a *plain* bind, while a real instance holds it with
+    `SO_REUSEADDR`. Corrected to reproduce how a real instance holds a port, after
+    which the mutation is caught.
+  * **Release `v2.0.1`** carries the fixed build:
+    `PalmSentinelV2-win64.zip`, **83,403,132 bytes**, sha256
+    `63a0f9029181e655b6fd0ccc631c0fd5c2ce3818c7b3a2a6291f3de5831bb783`, and
+    `/releases/latest` resolves to it. It was zipped **before the build was ever
+    run**, so it extracts to `PalmSentinelV2.exe` and `_internal/` with no `data/`
+    folder — the download and a fresh spec build are now the same thing, and the
+    README sentence that previously had to explain the difference no longer does.
+    `v2.0.0` is left in place rather than having its bytes replaced under the same
+    version number.
   * **`F:\PalmSentinel-AI` remains unmodified and read-only**: `git status
     --porcelain` empty at HEAD `cd0c22e`.

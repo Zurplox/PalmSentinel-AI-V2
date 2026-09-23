@@ -17,20 +17,18 @@ Full analysis, numbers and evidence: [`SYSTEM_LIVING_LOG_V2.md`](SYSTEM_LIVING_L
 
 ### The packaged build — needs nothing installed
 
-**[Download the standalone Windows build (v2.0.0)](https://github.com/Zurplox/PalmSentinel-AI-V2/releases/latest)**
-— `PalmSentinelV2-win64.zip`, about 82 MB. Unzip it anywhere and run
+**[Download the standalone Windows build (v2.0.1)](https://github.com/Zurplox/PalmSentinel-AI-V2/releases/latest)**
+— `PalmSentinelV2-win64.zip`, about 80 MB. Unzip it anywhere and run
 `PalmSentinelV2.exe` from inside; the bundled demo orthomosaic loads on first run,
 so the first census works with nothing else installed. Windows SmartScreen may warn
 about an unknown publisher, because the build is not code-signed.
 
-Or [build it yourself](#build-the-packaged-version). That produces the same
-application but not quite the same folder: a fresh build is only
-`PalmSentinelV2.exe` plus the `_internal\` bundle beside it, with no `data\`
-folder yet. `data\` is the imagery library, and the first run creates it next to
-the executable and copies the bundled demo into it, so the Library dialog has
-something to list. The v2.0.0 download above already contains that first-run
-`data\`, because the build was started once before it was packaged; a build of
-your own grows it on first use instead.
+Or [build it yourself](#build-the-packaged-version), which produces the same
+thing: `PalmSentinelV2.exe` plus the `_internal\` bundle beside it, and no `data\`
+folder. `data\` is the imagery library; the first run creates it next to the
+executable and copies the bundled demo into it, so the Library dialog has
+something to list. Neither the download nor a build of your own contains anyone
+else's imagery.
 
 **What this needs:** Windows 10 or 11, 64-bit, and the Microsoft Edge WebView2
 runtime. WebView2 ships with Windows 10/11 and with Microsoft Edge; if it has
@@ -89,11 +87,26 @@ It names the flight it has loaded and then serves the identical interface on
 ```
 
 The interface, the census, the numbers and the exports are the same ones the
-desktop window and the packaged build produce. Two things to know before you use
-it: the port is fixed at 5000 with no flag to change it, and starting a second
-copy while one is already running does **not** report a conflict — the operating
-system lets both bind 5000, so which process answers a request stops being
-something you control. Stop the running one first.
+desktop window and the packaged build produce.
+
+### Launching it twice
+
+The default port is **5000**. If it is already taken — by another copy of
+PalmSentinel, or by anything else — the next free port is used, and the port that
+was taken is named: on the console for `app.py`, and in the window title for the
+desktop build, which reads `PalmSentinel V2 — port 5001` when it is not on 5000.
+Two instances therefore never become two listeners on one port.
+
+To choose the port yourself, pass `--port` to either entry point:
+
+```
+python app.py --port 5123
+python desktop_app.py --port 5123
+PalmSentinelV2.exe --port 5123
+```
+
+An explicit port is the port used, or the launch stops and says which port is in
+the way and how to change it. It is never silently swapped for a different one.
 
 ### Build the packaged version
 
@@ -175,6 +188,7 @@ why a self-referential audit could not see it.
 | `desktop_app.py` | The desktop window, and the `--check` / `--selftest` entry points. |
 | `app.py` | Browser entry point: the same application served on `127.0.0.1:5000`, no window. |
 | `paths.py` | Where files live: read-only assets in the bundle, writable library beside the exe. |
+| `ports.py` | Which port an instance serves on, and the guarantee that two never share one. |
 | `Launcher.cs`, `PalmSentinel.exe` | Source-checkout launcher with a dependency preflight; writes `launcher.log` because a GUI process has no console. |
 | `Launch_PalmSentinel.bat`, `.ps1` | The double-click entry points: prefer the packaged build, otherwise preflight Python and name whatever is missing. |
 | `PalmSentinelV2.spec` | The standalone build's recipe. |

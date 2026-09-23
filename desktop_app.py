@@ -4,7 +4,7 @@ PalmSentinel V2 -- native desktop window.
     python desktop_app.py                    open the desktop window
     python desktop_app.py --check            verify the desktop stack and exit
     python desktop_app.py --selftest         drive the whole census headlessly
-    python desktop_app.py --port 5123        pin the HTTP port a browser can attach to
+    python desktop_app.py --port 5123        serve on exactly this port, or refuse
 
 The window is Edge WebView2 over a local server.  Nothing is transmitted
 anywhere: the vision pipeline, the census and every export run on this computer.
@@ -21,8 +21,12 @@ Three deliberate differences from the previous version's desktop shell:
   static files, the packaged demo orthomosaic, a full census and a CSV export --
   so a build can be checked without a human clicking anything.  A packaged app
   that boots but cannot find its own imagery fails here.
-* **The port is pinnable.**  `--port` lets a second window, a browser, or a
-  verification script attach to the same server instead of racing for 5000.
+* **The port cannot be shared.**  The default is 5000; if it is taken, the next
+  free port is used and the port that was taken is named -- in the window title
+  and on stdout -- so a second launch is visible instead of quietly becoming a
+  second listener on the first one's socket.  `--port` pins an exact port and
+  refuses rather than moving, because a pinned port that silently becomes a
+  different port is worse than a refusal.
 """
 
 from __future__ import annotations
@@ -39,9 +43,9 @@ if sys.platform == "win32":
         pass
 
 import paths
+import ports
 
 WINDOW_TITLE = "PalmSentinel V2"
-DEFAULT_PORT = None  # None -> let the windowing layer pick a free port.
 
 #: The verified dev-path result for the bundled demo orthomosaic, which is
 #: 1.0000 ha at 4 cm/px assessed against the mature 9 m standard.  --selftest
@@ -286,17 +290,49 @@ def _disable_page_zoom(webview) -> None:
         print(f"[PalmSentinel] WebView2 zoom patch unavailable: {exc}")
 
 
-def _parse_port(argv: list[str]) -> int | None:
-    if "--port" not in argv:
-        return DEFAULT_PORT
+def _report_fatal(message: str) -> None:
+    """
+    Say something that stopped the launch, where a double-click can see it.
+
+    A windowed process started from Explorer has no console, so anything on
+    stderr goes nowhere.  That is the same reason the launcher writes
+    ``launcher.log`` and shows a dialog instead of printing: a failure the user
+    cannot see is a failure they will report as "it does nothing".
+    """
+    print(message, file=sys.stderr)
+    if sys.platform != "win32":
+        return
     try:
-        return int(argv[argv.index("--port") + 1])
-    except (IndexError, ValueError):
-        raise SystemExit("[PalmSentinel] --port needs a number, e.g. --port 5123")
+        import ctypes
+
+        ctypes.windll.user32.MessageBoxW(None, message, WINDOW_TITLE, 0x10)
+    except Exception:  # pragma: no cover - platform dependent
+        pass
+
+
+def _claim(argv: list[str]) -> ports.Claim:
+    """Claim the port this window will serve on, or stop with a visible message."""
+    try:
+        return ports.claim(ports.requested_port(argv))
+    except ports.PortUnavailable as exc:
+        _report_fatal(f"[PalmSentinel] {exc}")
+        raise SystemExit(1)
+
+
+def _window_title(claimed: ports.Claim) -> str:
+    """
+    Name the port in the title when it is not the expected one.
+
+    The title bar is the only place a double-clicked window can show which port
+    it ended up on, because the packaged build has no console to print to.
+    """
+    if not claimed.shifted:
+        return WINDOW_TITLE
+    return f"{WINDOW_TITLE} — port {claimed.port}"
 
 
 def main(argv: list[str]) -> int:
-    port = _parse_port(argv)
+    claimed = _claim(argv)
     webview = _require_webview()
     _disable_page_zoom(webview)
 
@@ -304,11 +340,10 @@ def main(argv: list[str]) -> int:
     _start_preload(app)
 
     print(f"[PalmSentinel] layout: {paths.describe()}")
-    if port:
-        print(f"[PalmSentinel] serving this session on http://127.0.0.1:{port}")
+    print(claimed.announce())
 
     webview.create_window(
-        title=WINDOW_TITLE,
+        title=_window_title(claimed),
         url=app,
         width=1440,
         height=900,
@@ -321,7 +356,7 @@ def main(argv: list[str]) -> int:
         # server created per window, and start()'s http_port only configures the
         # *global* server, which a callable url never uses.  Passing it there
         # silently left the port unpinned.
-        http_port=port,
+        http_port=claimed.port,
     )
 
     try:
@@ -348,7 +383,7 @@ def main(argv: list[str]) -> int:
 # --------------------------------------------------------------------------
 
 
-def _window_selftest(report_path: str | None, port: int | None) -> int:
+def _window_selftest(report_path: str | None, argv: list[str]) -> int:
     """
     Open the real window and drive the real interface inside it.
 
@@ -360,6 +395,7 @@ def _window_selftest(report_path: str | None, port: int | None) -> int:
     Everything below is read back out of the live DOM through evaluate_js, so the
     evidence is the window's own state rather than this process's opinion of it.
     """
+    claimed = _claim(argv)
     webview = _require_webview()
     _disable_page_zoom(webview)
 
@@ -373,7 +409,7 @@ def _window_selftest(report_path: str | None, port: int | None) -> int:
         print(text)
 
     window = webview.create_window(
-        title=WINDOW_TITLE,
+        title=_window_title(claimed),
         url=app,
         width=1440,
         height=900,
@@ -382,7 +418,7 @@ def _window_selftest(report_path: str | None, port: int | None) -> int:
         text_select=True,
         zoomable=False,
         confirm_close=False,
-        http_port=port,
+        http_port=claimed.port,
     )
 
     # One budget for the whole drive phase, so a failure anywhere costs seconds
@@ -557,7 +593,7 @@ if __name__ == "__main__":
     if arguments and arguments[0] == "--selftest":
         if "--window" in arguments:
             raise SystemExit(
-                _window_selftest(_report_argument(arguments), _parse_port(arguments))
+                _window_selftest(_report_argument(arguments), arguments)
             )
         raise SystemExit(_selftest(_report_argument(arguments)))
     raise SystemExit(main(arguments))
