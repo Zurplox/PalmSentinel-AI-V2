@@ -1,0 +1,23 @@
+# Line endings are pinned for the files where they are a correctness question,
+# not left to the machine's `core.autocrlf` setting.
+#
+# cmd.exe parses a .bat line by line, and a LF-only batch file can mis-handle
+# labels and `goto`.  The launcher below uses `goto` to skip its error block, so
+# a checkout on a machine with autocrlf=false has to still get CRLF or the
+# launch path can break in a way that looks like something else entirely.
+
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# Binaries: never converted, never diffed as text.
+*.exe binary
+*.jpg binary
+*.jpeg binary
+*.png binary
+*.tif binary
+*.tiff binary
+
+# Imagery and the packaged build are large and already compressed, so asking git
+# to try compressing them again only costs time.
+*.jpg -text -diff
+*.exe -text -diff

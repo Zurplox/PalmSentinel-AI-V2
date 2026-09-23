@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="graphite">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PalmSentinel V2 — Drone Oil Palm Census</title>
+<link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+
+<!-- ── icon sprite: stroke icons, no emoji, no icon font ───────────────── -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <g id="i-palm"><path d="M12 21v-7"/><path d="M12 14c0-3 2-5 5-5"/><path d="M12 14c0-3-2-5-5-5"/><path d="M12 11c1.5-2.5 4-3 6.5-2.5"/><path d="M12 11c-1.5-2.5-4-3-6.5-2.5"/><path d="M6 5.5c3-1.5 6.5-.5 8 2"/><path d="M18 5.5c-3-1.5-6.5-.5-8 2"/></g>
+    <g id="i-upload"><path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></g>
+    <g id="i-folder"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></g>
+    <g id="i-crosshair"><circle cx="12" cy="12" r="7"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></g>
+    <g id="i-polygon"><path d="M12 3.5 20 9l-3 9H7l-3-9z"/></g>
+    <g id="i-box"><rect x="4" y="5" width="16" height="14" rx="1.5"/></g>
+    <g id="i-hand"><path d="M8 12V6.5a1.5 1.5 0 0 1 3 0V11"/><path d="M11 11V5.5a1.5 1.5 0 0 1 3 0V11"/><path d="M14 11V7a1.5 1.5 0 0 1 3 0v7a6 6 0 0 1-6 6h-.7a5 5 0 0 1-3.8-1.8l-2.9-3.5a1.6 1.6 0 0 1 2.3-2.2L8 14"/></g>
+    <g id="i-pointer"><path d="M5 3l6.5 16 2.2-6.1 6.1-2.2z"/></g>
+    <g id="i-layers"><path d="M12 3 3 8l9 5 9-5z"/><path d="M3 13l9 5 9-5"/></g>
+    <g id="i-table"><rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M3 9h18M9 9v11"/></g>
+    <g id="i-download"><path d="M12 4v11"/><path d="M8 11l4 4 4-4"/><path d="M4 19h16"/></g>
+    <g id="i-rule"><path d="M3 16 16 3l5 5L8 21z"/><path d="M8 11l2 2M11 8l2 2M5 14l2 2"/></g>
+    <g id="i-map"><path d="M9 4 3 6.5v13L9 17l6 2.5 6-2.5v-13L15 7z"/><path d="M9 4v13M15 7v12.5"/></g>
+    <g id="i-refresh"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v5h-5"/></g>
+    <g id="i-expand"><path d="M4 9V4h5"/><path d="M20 15v5h-5"/><path d="M15 4h5v5"/><path d="M9 20H4v-5"/></g>
+    <g id="i-alert"><path d="M12 4 2.5 20h19z"/><path d="M12 10v4M12 17.2v.1"/></g>
+    <g id="i-check"><path d="M4.5 12.5 9 17 19.5 6.5"/></g>
+    <g id="i-close"><path d="M6 6l12 12M18 6L6 18"/></g>
+    <g id="i-chevron"><path d="M8 10l4 4 4-4"/></g>
+    <g id="i-info"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.8v.1"/></g>
+    <g id="i-grid"><path d="M4 9h16M4 15h16M9 4v16M15 4v16"/></g>
+  </defs>
+</svg>
+
+<header class="topbar">
+  <div class="brand">
+    <svg class="brand__mark" viewBox="0 0 24 24"><use href="#i-palm"/></svg>
+    <div class="brand__text">
+      <span class="brand__name">PalmSentinel</span>
+      <span class="brand__ver">V2</span>
+    </div>
+  </div>
+
+  <div class="topbar__file" id="file-summary">
+    <span class="dot dot--idle"></span>
+    <span class="topbar__file-name" id="file-name">No orthomosaic loaded</span>
+    <span class="topbar__file-meta mono" id="file-meta"></span>
+  </div>
+
+  <div class="topbar__actions">
+    <button class="btn" id="btn-open-image" title="Load an orthomosaic from this computer">
+      <svg viewBox="0 0 24 24"><use href="#i-upload"/></svg><span>Load</span>
+    </button>
+    <button class="btn" id="btn-pick-file" title="Choose flight already in the local data folder">
+      <svg viewBox="0 0 24 24"><use href="#i-folder"/></svg><span>Library</span>
+    </button>
+    <button class="btn" id="btn-fit" title="Fit the whole orthomosaic (F)">
+      <svg viewBox="0 0 24 24"><use href="#i-expand"/></svg><span>Fit</span>
+    </button>
+    <button class="btn" id="btn-native" title="1:1 sensor pixels (1)">
+      <svg viewBox="0 0 24 24"><use href="#i-crosshair"/></svg><span>1:1</span>
+    </button>
+    <button class="btn btn--icon" id="btn-shortcuts" title="Keyboard reference (?)">
+      <svg viewBox="0 0 24 24"><use href="#i-info"/></svg>
+    </button>
+  </div>
+  <input type="file" id="file-input" accept=".jpg,.jpeg,.png,.tif,.tiff" hidden>
+</header>
+
+<main class="shell">
+
+  <!-- ── control rail ─────────────────────────────────────────────────── -->
+  <aside class="rail" id="rail">
+
+    <section class="group">
+      <h2 class="group__title"><span class="group__n">1</span>Imagery</h2>
+      <button class="btn btn--primary btn--wide" id="btn-upload">
+        <svg viewBox="0 0 24 24"><use href="#i-upload"/></svg>
+        <span>Upload an orthomosaic</span>
+      </button>
+      <label class="field">
+        <span class="field__label">Flight in data folder</span>
+        <select class="input" id="select-flight"><option value="">— none —</option></select>
+      </label>
+      <label class="field">
+        <span class="field__label">Local path</span>
+        <span class="field__row">
+          <input class="input mono" id="input-path" type="text" placeholder="D:\flights\mosaic.tif">
+          <button class="btn btn--compact" id="btn-path">Open</button>
+        </span>
+      </label>
+      <p class="note" id="note-decode" hidden></p>
+    </section>
+
+    <section class="group">
+      <h2 class="group__title"><span class="group__n">2</span>Ground sample distance</h2>
+      <label class="field">
+        <span class="field__label">
+          cm per pixel
+          <span class="hint" title="Every area and density figure scales with the square of this number.">?</span>
+        </span>
+        <span class="field__row">
+          <input class="input mono" id="input-gsd" type="number" min="0.2" max="60" step="0.1" value="4.0">
+          <span class="unit mono">cm/px</span>
+        </span>
+      </label>
+      <p class="note" id="note-extent"></p>
+    </section>
+
+    <section class="group">
+      <h2 class="group__title"><span class="group__n">3</span>Planting standard</h2>
+      <div class="segmented" id="seg-standard" role="radiogroup" aria-label="Planting standard"></div>
+      <p class="note" id="note-standard"></p>
+      <p class="note note--warn" id="note-spacing"></p>
+    </section>
+
+    <section class="group">
+      <h2 class="group__title"><span class="group__n">4</span>Region of interest</h2>
+      <div class="toolbar" id="tool-toolbar">
+        <button class="tool is-active" data-tool="polygon" title="Draw a survey polygon (P)">
+          <svg viewBox="0 0 24 24"><use href="#i-polygon"/></svg><span>Polygon</span></button>
+        <button class="tool" data-tool="box" title="Draw a rectangle (B)">
+          <svg viewBox="0 0 24 24"><use href="#i-box"/></svg><span>Box</span></button>
+        <button class="tool" data-tool="pan" title="Pan (H, or hold Space)">
+          <svg viewBox="0 0 24 24"><use href="#i-hand"/></svg><span>Pan</span></button>
+        <button class="tool" data-tool="edit" title="Add or remove palm markers (E)">
+          <svg viewBox="0 0 24 24"><use href="#i-pointer"/></svg><span>Edit</span></button>
+      </div>
+      <div class="row row--split">
+        <button class="btn btn--compact" id="btn-undo" title="Undo the last vertex (Ctrl+Z)">
+          <svg viewBox="0 0 24 24"><use href="#i-refresh"/></svg><span>Undo</span>
+        </button>
+        <button class="btn btn--compact btn--danger" id="btn-clear" title="Clear the selection (Esc)">
+          <svg viewBox="0 0 24 24"><use href="#i-close"/></svg><span>Clear</span>
+        </button>
+      </div>
+      <p class="note" id="note-roi">No region selected — a census will cover the whole orthomosaic.</p>
+    </section>
+
+    <section class="group">
+      <h2 class="group__title"><span class="group__n">5</span>Run census</h2>
+      <label class="field">
+        <span class="field__label">Block name</span>
+        <input class="input" id="input-block" type="text" value="Blok 1" maxlength="64">
+      </label>
+      <button class="btn btn--primary btn--wide btn--run" id="btn-run">
+        <svg viewBox="0 0 24 24"><use href="#i-crosshair"/></svg>
+        <span id="run-label">Run census</span>
+      </button>
+      <p class="note" id="note-run">Reads full-resolution pixels. Nothing is uploaded.</p>
+      <details class="advanced">
+        <summary>Advanced</summary>
+        <label class="field">
+          <span class="field__label">Tile size <span class="mono" id="out-tile">1536</span> px</span>
+          <input class="range" id="input-tile" type="range" min="512" max="4096" step="256" value="1536">
+        </label>
+        <label class="field">
+          <span class="field__label">Vegetation threshold <span class="mono" id="out-threshold">auto</span></span>
+          <input class="range" id="input-threshold" type="range" min="0" max="200" step="1" value="0">
+        </label>
+        <p class="note">Threshold 0 means Otsu, resolved once for the whole region.</p>
+      </details>
+    </section>
+
+    <section class="group">
+      <h2 class="group__title"><span class="group__n">6</span>Overlays</h2>
+      <label class="check"><input type="checkbox" id="chk-palms" checked><span>Palm markers</span></label>
+      <label class="check"><input type="checkbox" id="chk-ids"><span>Palm identifiers</span></label>
+      <label class="check"><input type="checkbox" id="chk-exclusion"><span>Minimum-spacing circles</span></label>
+      <label class="check"><input type="checkbox" id="chk-minimap" checked><span>Overview navigator</span></label>
+      <label class="check"><input type="checkbox" id="chk-edges" checked><span>Ground distances on ROI edges</span></label>
+    </section>
+
+    <section class="group group--loupe">
+      <h2 class="group__title"><span class="group__n">7</span>Single-crown inspector</h2>
+      <div class="loupe">
+        <img id="loupe-img" alt="" hidden>
+        <div class="loupe__empty" id="loupe-empty">Point at the map to inspect a crown at sensor resolution.</div>
+        <svg class="loupe__overlay" id="loupe-overlay" viewBox="0 0 320 320" preserveAspectRatio="xMidYMid slice" hidden>
+          <circle id="loupe-ring" cx="160" cy="160" r="40"/>
+          <path d="M160 148v24M148 160h24"/>
+        </svg>
+      </div>
+      <p class="note mono" id="loupe-readout">—</p>
+    </section>
+
+  </aside>
+
+  <!-- ── map ──────────────────────────────────────────────────────────── -->
+  <section class="stage" id="stage">
+    <canvas id="canvas"></canvas>
+
+    <div class="stage__loading" id="loading" hidden>
+      <span class="spinner" aria-hidden="true"></span>
+      <span id="loading-label">Loading…</span>
+    </div>
+
+    <div class="stage__empty" id="stage-empty">
+      <svg viewBox="0 0 24 24"><use href="#i-layers"/></svg>
+      <h3>No orthomosaic loaded</h3>
+      <p>Upload a drone orthophoto, open one from the local data folder, or drop a file onto this window.</p>
+    </div>
+
+    <div class="navigator" id="navigator">
+      <div class="navigator__head">
+        <span>Overview</span>
+        <span class="mono" id="nav-res">—</span>
+      </div>
+      <div class="navigator__body" id="nav-body">
+        <canvas id="minimap" width="150" height="150"></canvas>
+        <div class="navigator__view" id="nav-view"></div>
+      </div>
+    </div>
+
+    <div class="dropzones" id="dropzone" hidden>
+      <svg viewBox="0 0 24 24"><use href="#i-upload"/></svg>
+      <strong>Drop an orthophoto to load it</strong>
+      <span>JPG, PNG or TIFF. It stays on this computer.</span>
+    </div>
+
+    <footer class="readout">
+      <span class="readout__item mono"><span class="readout__k">full px</span><span id="ro-xy">—</span></span>
+      <span class="readout__item mono"><span class="readout__k">ground m</span><span id="ro-m">—</span></span>
+      <span class="readout__sep"></span>
+      <span class="readout__item mono"><span class="readout__k">zoom</span><span id="ro-zoom">—</span></span>
+      <span class="readout__item mono"><span class="readout__k">gsd</span><span id="ro-gsd">—</span></span>
+      <span class="readout__sep"></span>
+      <span class="readout__item mono"><span class="readout__k">layer</span><span id="ro-layer">preview</span></span>
+      <span class="readout__spacer"></span>
+      <span class="readout__item mono" id="ro-scale"></span>
+      <div class="scalebar" id="scalebar"><i></i></div>
+    </footer>
+  </section>
+
+  <!-- ── results ──────────────────────────────────────────────────────── -->
+  <aside class="panel" id="panel">
+    <div class="panel__head">
+      <h2>Results</h2>
+      <span class="panel__state" id="panel-state">idle</span>
+    </div>
+
+    <div class="panel__body" id="panel-body">
+      <div class="placeholder" id="results-placeholder">
+        <svg viewBox="0 0 24 24"><use href="#i-table"/></svg>
+        <p>Run a census to see the stand density, spacing distribution and per-palm table.</p>
+      </div>
+
+      <div id="results" hidden>
+        <div class="kpis">
+          <div class="kpi">
+            <span class="kpi__k">Palms</span>
+            <span class="kpi__v mono" id="k-palms">0</span>
+          </div>
+          <div class="kpi">
+            <span class="kpi__k">Area</span>
+            <span class="kpi__v mono" id="k-area">0.00 <em>ha</em></span>
+          </div>
+          <div class="kpi kpi--wide">
+            <span class="kpi__k">Stand density</span>
+            <span class="kpi__v mono"><span id="k-sph">0</span> <em>SPH</em></span>
+            <span class="kpi__sub" id="k-band">—</span>
+          </div>
+        </div>
+
+        <div class="density" id="density">
+          <div class="density__track">
+            <div class="density__target" id="density-target"></div>
+            <div class="density__marker" id="density-marker"></div>
+          </div>
+          <div class="density__axis">
+            <span class="mono" id="density-min">0</span>
+            <span class="mono" id="density-ref">—</span>
+            <span class="mono" id="density-max">300</span>
+          </div>
+          <p class="note" id="density-note">—</p>
+        </div>
+
+        <section class="sub">
+          <h3>Spacing <span class="sub__hint">nearest-neighbour distance between detected palms</span></h3>
+          <table class="kv">
+            <tbody>
+              <tr><th>Median</th><td class="mono" id="s-median">—</td></tr>
+              <tr><th>Most common</th><td class="mono" id="s-mode">—</td></tr>
+              <tr><th>10th–90th percentile</th><td class="mono" id="s-range">—</td></tr>
+              <tr><th>Measured pitch for comparison</th><td class="mono" id="s-pitch">—</td></tr>
+            </tbody>
+          </table>
+          <p class="note" id="spacing-verdict">—</p>
+        </section>
+
+        <section class="sub">
+          <h3>Census quality</h3>
+          <ul class="checks" id="quality-checks"></ul>
+          <table class="kv">
+            <tbody>
+              <tr><th>Candidate apexes</th><td class="mono" id="q-candidates">—</td></tr>
+              <tr><th>Rejected by spacing</th><td class="mono" id="q-suppressed">—</td></tr>
+              <tr><th>Closest accepted pair</th><td class="mono" id="q-closest">—</td></tr>
+              <tr><th>Tiles processed</th><td class="mono" id="q-tiles">—</td></tr>
+              <tr><th>Vegetation threshold</th><td class="mono" id="q-threshold">—</td></tr>
+              <tr><th>Apical rosette radius</th><td class="mono" id="q-rosette">—</td></tr>
+              <tr><th>Elapsed</th><td class="mono" id="q-elapsed">—</td></tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section class="sub">
+          <h3>Palms <span class="sub__hint" id="palm-count-hint"></span></h3>
+          <div class="table-wrap">
+            <table class="grid" id="palm-table">
+              <thead>
+                <tr>
+                  <th data-sort="id" class="is-sorted">#</th>
+                  <th data-sort="x_m" class="num">east m</th>
+                  <th data-sort="y_m" class="num">north m</th>
+                  <th data-sort="rosette_m" class="num">rosette m</th>
+                  <th data-sort="peak" class="num">peak</th>
+                </tr>
+              </thead>
+              <tbody id="palm-rows"></tbody>
+            </table>
+          </div>
+          <p class="note" id="palm-table-note"></p>
+        </section>
+
+        <section class="sub">
+          <h3>Export</h3>
+          <div class="row row--grid">
+            <button class="btn btn--compact" id="btn-csv"><svg viewBox="0 0 24 24"><use href="#i-download"/></svg><span>CSV</span></button>
+            <button class="btn btn--compact" id="btn-geojson"><svg viewBox="0 0 24 24"><use href="#i-map"/></svg><span>GeoJSON</span></button>
+            <button class="btn btn--compact" id="btn-annotated"><svg viewBox="0 0 24 24"><use href="#i-grid"/></svg><span>Annotated</span></button>
+            <button class="btn btn--compact" id="btn-png"><svg viewBox="0 0 24 24"><use href="#i-layers"/></svg><span>View PNG</span></button>
+          </div>
+        </section>
+      </div>
+    </div>
+  </aside>
+</main>
+
+<!-- ── library / file pickers ───────────────────────────────────────────── -->
+<dialog class="modal" id="library">
+  <form method="dialog" class="modal__box">
+    <header class="modal__head">
+      <h3>Local library</h3>
+      <button class="btn btn--icon" value="cancel"><svg viewBox="0 0 24 24"><use href="#i-close"/></svg></button>
+    </header>
+    <div class="modal__body filelist" id="library-list"></div>
+    <footer class="modal__foot">
+      <p class="note">Files in <code class="mono" id="library-dir">data/</code>. Drone imagery is never committed to version control.</p>
+    </footer>
+  </form>
+</dialog>
+
+<dialog class="modal" id="shortcuts">
+  <form method="dialog" class="modal__box">
+    <header class="modal__head">
+      <h3>Keyboard reference</h3>
+      <button class="btn btn--icon" value="cancel"><svg viewBox="0 0 24 24"><use href="#i-close"/></svg></button>
+    </header>
+    <div class="modal__body">
+      <table class="kv kv--keys">
+        <tbody>
+          <tr><th colspan="2">Navigation</th></tr>
+          <tr><th><kbd>Space</kbd> hold</th><td>Temporary pan, without leaving the current tool</td></tr>
+          <tr><th><kbd>Scroll</kbd></th><td>Zoom at the pointer</td></tr>
+          <tr><th><kbd>Double click</kbd></th><td>Zoom in one step at the pointer</td></tr>
+          <tr><th><kbd>F</kbd> / <kbd>1</kbd></th><td>Fit image / actual sensor pixels</td></tr>
+          <tr><th colspan="2">Polygon region</th></tr>
+          <tr><th><kbd>Click</kbd></th><td>Add a vertex</td></tr>
+          <tr><th><kbd>Enter</kbd></th><td>Close the polygon</td></tr>
+          <tr><th>Drag a vertex</th><td>Move it</td></tr>
+          <tr><th><kbd>Alt</kbd> + click</th><td>Delete that vertex</td></tr>
+          <tr><th><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Backspace</kbd></th><td>Remove the last vertex</td></tr>
+          <tr><th><kbd>Esc</kbd></th><td>Clear the selection</td></tr>
+          <tr><th colspan="2">Tools</th></tr>
+          <tr><th><kbd>P</kbd> <kbd>B</kbd> <kbd>H</kbd> <kbd>E</kbd></th><td>Polygon, Box, Pan, Edit</td></tr>
+          <tr><th><kbd>Ctrl</kbd>+<kbd>Enter</kbd></th><td>Run the census</td></tr>
+          <tr><th><kbd>?</kbd></th><td>This panel</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </form>
+</dialog>
+
+<div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+
+<script type="module" src="/static/js/main.js"></script>
+</body>
+</html>

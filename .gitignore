@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Drone imagery is private and must never be tracked.
+*.tif
+*.tiff
+*.jpg
+*.jpeg
+*.png
+!data/demo_palm_estate.jpg
+
+# Outputs
+output/
+*.csv
+*.geojson
+
+# Build artefacts.  The spec files are source and are tracked; what they emit is
+# not -- dist/ is ~200 MB of bundled interpreter and libraries, reproducible with
+# `pyinstaller --noconfirm PalmSentinelV2.spec`.
+build/
+dist/
+*.manifest
+
+# The launcher writes this on every run so a silent failure is impossible.
+launcher.log
+
+# IDE
+.vscode/
+.idea/
+.DS_Store
+
+# Agent/editor scratch that belongs to the machine, not the project.
+.freebuff/

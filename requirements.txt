@@ -1,0 +1,42 @@
+# PalmSentinel V2 -- dependencies.
+#
+# Install the runtime set to run from source:
+#
+#     pip install -r requirements.txt
+#
+# You do NOT need any of this to run the packaged build.  dist/PalmSentinelV2/
+# carries its own Python interpreter and its own copies of every package below;
+# see README.md.
+#
+# The previous version's list omitted Flask and pywebview while its own code
+# imported both, so a fresh install produced an application that could not open
+# its window.  Everything imported at runtime is named here.
+
+# ---------------------------------------------------------------- runtime ---
+
+# Local web server and the API the interface talks to.
+flask>=3.0.0
+
+# The desktop window (Edge WebView2 on Windows).  pywebview declares pythonnet,
+# bottle, proxy_tools and typing_extensions itself, all of which are installed
+# with it.
+pywebview>=5.0
+
+# Serving a WSGI application through pywebview runs on Bottle.  It arrives as a
+# pywebview dependency, but the windowed application does not start without it,
+# so it is named here rather than left implicit.
+bottle>=0.12
+
+# Computer vision and numerics.
+opencv-python>=4.8.0
+numpy>=1.24.0
+pillow>=10.0.0          # fallback decoder for JPEG/TIFF variants OpenCV refuses
+
+# ------------------------------------------------------------------ build ---
+# Only needed to produce the standalone build:
+#
+#     pyinstaller --noconfirm PalmSentinelV2.spec
+#
+# Left commented so that a plain `pip install -r requirements.txt` stays a
+# runtime install.  Uncomment, or install it directly, when building.
+# pyinstaller>=6.0
