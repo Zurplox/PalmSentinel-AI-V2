@@ -175,12 +175,57 @@ class PalmStandard:
     """
     Two distinct palms may not be closer than this fraction of the pitch.
 
-    Calibrated against the external industrial standard rather than against this
-    project's own output: on the bundled 1.0000 ha mature demonstration block,
-    the resulting stand density is 164 SPH at 0.60, 154 at 0.65, 147 at 0.70,
-    **140 at 0.75**, 127 at 0.80 and 109 at 0.85.  0.75 is the only setting that
-    lands inside the 136-143 SPH target this project quotes as its benchmark, so
-    it is the value used.  The full sweep is reproduced in the V2 log.
+    The exclusion radius is ``fraction x expected_spacing_m``: 6.75 m at the
+    mature standard, 5.70 m at the young one.  It has to sit between two physical
+    limits, both derivable from the standards below rather than from this
+    project's imagery:
+
+    * **Above the palm's own apex structure.**  A mature crown presents several
+      bright frond apexes within metres of the bud, and a detector that keeps the
+      strongest and discards the rest needs the radius to cover them.
+      :data:`ROSETTE_RADIUS_SEARCH_M` bounds that structure at roughly 4 m on
+      this project's imagery.
+    * **Below the true nearest-neighbour spacing.**  The estate pattern is
+      9.0 m x 7.8 m, whose nearest-neighbour distance is 7.8 m (9.0 m if read as
+      a triangular pitch); both readings are 142.5 SPH.  Merging two real palms
+      undercounts the block, which is the error that costs money.
+
+    0.75 puts the radius inside that window on both sides.
+
+    **Evidence it is a model parameter and not a fit to one image.**  Graded
+    against a synthetic triangular plantation whose density is arithmetic and
+    which contains nothing from the pipeline (``tests/ground_truth.py``), with
+    palm size held at a real mature crown:
+
+    * at the standard's own pitch it recovers the truth -- 142.5 SPH against a
+      true 142.5 at +/-1.0 m planting error (0.00%), +0.64% on a surveyed
+      lattice, -1.72% at +/-1.5 m;
+    * the count is *flat* in this fraction over 0.70-0.80 (within 1.3%) and only
+      collapses at 0.90 on a surveyed lattice, where the radius starts swallowing
+      genuine neighbours (-6.4%; -48% at 1.00) -- so the fraction is not
+      manufacturing the answer the way a fitted constant would;
+    * the census tracks density across a factor of three (7.0 m true pitch is
+      235.7 SPH, 12.0 m is 79.7, both recovered as such), so no single number is
+      being echoed back;
+    * it is invariant to tiling (512 px to whole-image: identical count) and to
+      the ground sample distance (2-8 cm/px: within 1.3%), so the area that SPH
+      divides by is not inheriting a hidden constant.
+
+    **Validity domain, measured rather than assumed.**  The radius is a fraction
+    of the pitch the caller *declares*, so accuracy depends on declaring the
+    right standard.  With +/-1 m of planting error the SPH error stays under 8%
+    while the true pitch is within 5.6% of the declared one, and reaches -22% on
+    a block 11% tighter than declared.  A mis-declared standard is the dominant
+    error term in a census, and nothing here detects it.
+
+    Left open deliberately: 0.70 has the smaller worst case across an 8-10 m
+    band (6.9% versus 13.5%), because on a tightly planted block 6.75 m comes
+    close to the true nearest-neighbour spacing.  0.75 is kept because on real
+    imagery this radius does most of its work suppressing frond-structure
+    apexes -- 628 raw candidates become 140 on the bundled demo -- and a uniform
+    synthetic crown cannot measure that side of the trade.  Settling it needs a
+    hand-labelled real patch, which this project does not have.  See the V2
+    decision log.
     """
 
     blur_m: float

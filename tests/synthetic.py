@@ -16,6 +16,20 @@ import numpy as np
 from palmsentinel.scale import GroundScale
 
 Point = Tuple[float, float]
+Rect = Tuple[float, float, float, float]  # x0, y0, x1, y1 in ground metres
+
+
+def nominal_sph(pitch_m: float) -> float:
+    """
+    The stand density a triangular planting of this nearest-neighbour pitch *is*.
+
+    A triangular (equilateral) grid of pitch ``p`` occupies ``p * p * sqrt(3)/2``
+    square metres per palm, so the density is exact arithmetic, not a measurement:
+    9.0 m gives 142.55 SPH, which is the 9.0 m x 7.8 m estate standard quoted in
+    :mod:`palmsentinel.agronomy`.  This is the ground truth the detector is graded
+    against, and it contains nothing from the pipeline.
+    """
+    return 10000.0 * 2.0 / (math.sqrt(3.0) * pitch_m * pitch_m)
 
 
 def triangular_lattice(pitch_m: float, cols: int, rows: int) -> List[Point]:
@@ -27,6 +41,99 @@ def triangular_lattice(pitch_m: float, cols: int, rows: int) -> List[Point]:
         for c in range(cols):
             points.append((offset + c * pitch_m, r * row_spacing))
     return points
+
+
+def jittered_lattice(
+    pitch_m: float,
+    cols: int,
+    rows: int,
+    jitter_m: float = 0.0,
+    seed: int = 7,
+) -> List[Point]:
+    """
+    A planted grid with planting error.
+
+    Real blocks are not surveyed lattices: a planting crew leaves each palm some
+    distance from its nominal position, and the two palms that close on each other
+    can end up much nearer than the pitch.  ``jitter_m`` is the radius of a disc
+    around each nominal position, sampled uniformly in area, which is the standard
+    way to model that.  Jitter is what decides whether a minimum-spacing rule that
+    is a *fraction of the pitch* is safe, so it has to be a parameter rather than
+    an accident of the fixture.
+    """
+    points = triangular_lattice(pitch_m, cols, rows)
+    if jitter_m <= 0.0:
+        return points
+    rng = np.random.default_rng(seed)
+    scattered: List[Point] = []
+    for x, y in points:
+        radius = jitter_m * math.sqrt(rng.random())  # uniform over the disc
+        angle = rng.random() * 2.0 * math.pi
+        scattered.append((x + radius * math.cos(angle), y + radius * math.sin(angle)))
+    return scattered
+
+
+def points_inside(roi: Rect, points_m: Sequence[Point]) -> int:
+    """How many planted palms lie strictly inside an axis-aligned region."""
+    x0, y0, x1, y1 = roi
+    return sum(1 for x, y in points_m if x0 < x < x1 and y0 < y < y1)
+
+
+def representative_roi(
+    points_m: Sequence[Point],
+    pitch_m: float,
+    inset_range: Tuple[float, float] = (1.0, 4.0),
+) -> Rect:
+    """
+    The patch of a plantation whose own density **is** ``nominal_sph(pitch)``.
+
+    An inset rectangle does not automatically contain a representative number of
+    palms: the count is an integer, so truncating at the edges can lose most of a
+    column and bias the patch density by several percent.  Rather than let that
+    bias be mistaken for detector error, the inset is chosen from a fine sweep as
+    the one whose implied density lands closest to the standard's exact density.
+
+    The choice depends only on the planted coordinates and the ROI area -- it
+    contains no measurement, no detection and no threshold -- so it removes an
+    edge artefact without flattering the pipeline.
+    """
+    xs = [p[0] for p in points_m]
+    ys = [p[1] for p in points_m]
+    target = nominal_sph(pitch_m)
+    lo, hi = inset_range
+    best: Tuple[float, Rect] = (float("inf"), (0.0, 0.0, 0.0, 0.0))
+    steps = 150
+    for step in range(steps + 1):
+        inset = lo + (hi - lo) * step / steps
+        roi = (
+            min(xs) + inset,
+            min(ys) + inset,
+            max(xs) - inset,
+            max(ys) - inset,
+        )
+        x0, y0, x1, y1 = roi
+        if x1 <= x0 or y1 <= y0:
+            continue
+        count = points_inside(roi, points_m)
+        if count == 0:
+            continue
+        area_ha = (x1 - x0) * (y1 - y0) / 10000.0
+        deviation = abs(count / area_ha - target)
+        if deviation < best[0]:
+            best = (deviation, roi)
+    return best[1]
+
+
+def roi_polygon_px(roi: Rect, origin_m: Point, scale: GroundScale):
+    """An axis-aligned ground region as an image-space polygon."""
+    x0, y0, x1, y1 = roi
+    ox, oy = origin_m
+    return (
+        (scale.m_to_px(x0 - ox), scale.m_to_px(y0 - oy)),
+        (scale.m_to_px(x1 - ox), scale.m_to_px(y0 - oy)),
+        (scale.m_to_px(x1 - ox), scale.m_to_px(y1 - oy)),
+        (scale.m_to_px(x0 - ox), scale.m_to_px(y1 - oy)),
+    )
 
 
 def render_plantation_at(

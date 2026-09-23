@@ -2,7 +2,7 @@
 
 > **Living Engineering Document & Decision Record**
 > *Target Audience: Autonomous AI Agents and engineers taking over this project.*
-> *Last Updated: 2026-09-23 13:17:00 Local Time*
+> *Last Updated: 2026-09-23 13:39:00 Local Time*
 > *Active Workspace: `E:\Freebuff\Palm Sentinel (V2)`*
 > *Predecessor, read-only reference: `F:\PalmSentinel-AI` (log: `SYSTEM_LIVING_LOG.md`)*
 > *This log follows the predecessor's method exactly, under a different name.*
@@ -999,3 +999,80 @@ record the supersession.
     version number.
   * **`F:\PalmSentinel-AI` remains unmodified and read-only**: `git status
     --porcelain` empty at HEAD `cd0c22e`.
+### [2026-09-23 13:39] — Is the census number true? The exclusion fraction graded against ground truth, and the published figures relabelled
+
+**Agent/Author:** Buffy (Freebuff). Pass requested by the owner: *"the census itself tested rather than the demo it was tuned on"* — specifically, whether `min_spacing_fraction = 0.75` is a defensible agronomic model or a fit to one image.
+
+**The question, stated exactly.** The exclusion radius is `0.75 x declared pitch` = **6.75 m** at the mature standard. Its justification in `agronomy.py` cited this project's own demo: *164 SPH at 0.60, 154 at 0.65, 147 at 0.70, **140 at 0.75**, 127 at 0.80, 109 at 0.85 — 0.75 is the only setting that lands inside the 136-143 target.* That is self-referential: the target it is calibrated to is the number the demo was tuned to produce. From outside it is indistinguishable from a fit, and the demo cannot settle it because the demo *is* the fitting surface.
+
+**Method.** `tests/ground_truth.py` (extending `tests/synthetic.py`, which already held `nominal_sph`/`triangular_lattice`/`representative_roi` — nothing duplicated): a triangular planting of exactly known pitch, palms at known coordinates, density **arithmetic** (`nominal_sph(9.0) = 142.56`, which is the estate standard's 9.0 x 7.8 m pattern, 142.45 SPH, to 0.07%), and the survey patch chosen by geometry alone. It contains no threshold, no detection and no measurement from the pipeline.
+
+Two method corrections were made **after** the first runs, both because the first version measured the wrong thing, and both are recorded because they change the answer:
+
+1. **Crown size was scaling with the sampled pitch**, so a "12 m pitch" case was drawn as 5.4 m-radius giants — not a real block. `recover(crown_pitch_m=...)` now holds palm size at the standard's real mature crown and moves only the *spacing*. This halved the apparent over-count at 12 m (+14.7% became +7.5%) and is the agronomically honest axis: widening a planting spaces real palms further apart, it does not grow them.
+2. The frame sweep had never run — it was passing a wrong keyword and dying on the first case. Fixed, and it turns out to carry a real effect (below).
+
+New: `tests/test_ground_truth.py`, **12 tests, 33.9 s**, asserting every finding here. `test_core.py` cannot cover this: its fixture renders palms at a 9.0 m pitch and 4 cm/px, which are the two quantities in question.
+
+**1. True pitch x planting error, fraction fixed at the shipped 0.75, palm size real:**
+
+| true pitch | jitter | true SPH | recovered SPH | error |
+| --- | --- | ---: | ---: | ---: |
+| 7.0 m | 0.0 m | 235.7 | 126.9 | **-46.2%** |
+| 8.0 m | 0.0 m | 180.4 | 180.4 | +0.0% |
+| 8.0 m | 1.0 m | 180.4 | 156.2 | -13.5% |
+| 8.0 m | 1.5 m | 180.4 | **140.0** | **-22.4%** |
+| 9.0 m | 0.0 m | 142.6 | 143.5 | +0.6% |
+| **9.0 m** | **1.0 m** | **142.5** | **142.5** | **+0.0%** |
+| 9.0 m | 1.5 m | 142.6 | 140.1 | -1.7% |
+| 10.0 m | 0.0 m | 115.4 | 115.4 | +0.0% |
+| 10.0 m | 1.0 m | 115.2 | 122.5 | +6.3% |
+| 12.0 m | 0.0 m | 79.7 | 79.7 | +0.0% |
+| 12.0 m | 1.0 m | 79.9 | 85.9 | +7.5% |
+
+**2. Does the count move with the fraction, or sit flat?** Surveyed lattice (jitter 0), mature standard:
+
+| fraction | 0.50 | 0.60 | 0.65 | 0.70 | 0.75 | 0.80 | 0.85 | 0.90 | 0.95 | 1.00 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| SPH error | +4.5% | +3.2% | +1.3% | +0.6% | +0.6% | +0.0% | +0.0% | **-6.4%** | -29.5% | -48.1% |
+
+There is a **plateau from 0.70 to 0.85** and then a cliff where the radius starts swallowing genuine neighbours. A constant fitted to one image would slide across the whole range; this one has a flat region, and 0.75 sits inside it rather than balanced on its edge.
+
+**3. The area is not inheriting a hidden constant.** Tile size 512 / 1024 / 1536 / 2048 / whole-image: **156 palms every time, +0.00%**, so tiling is exact. Ground sample distance 2 / 3 / 4 / 6 / 8 cm/px: -0.64% / -0.64% / +0.00% / -0.64% / +1.28% — and area scales with GSD *squared*, so this is the evidence that the pixel-to-metre path is consistent end to end rather than carrying an inherited number. Frame fraction 100 / 85 / 70 / 50 / 25%: +0.00% / **+5.43%** / +1.36% / +0.00% / +0.00% — a sub-rectangle survey carries an edge bias of up to ~5%, non-monotone because it depends on which crowns get clipped.
+
+**4. The domain, measured.** Radius is a fraction of the pitch the caller **declares**, so accuracy depends on declaring the right standard:
+
+| true pitch vs declared 9.0 m | jitter 0 | jitter 1.0 m | jitter 1.5 m |
+| --- | ---: | ---: | ---: |
+| 8.0 m (-11.1%) | +0.0% | -13.5% | **-22.4%** |
+| 8.5 m (-5.6%) | -0.0% | -3.9% | -7.5% |
+| 9.0 m (0.0%) | +0.6% | +0.0% | -1.7% |
+| 9.5 m (+5.6%) | +0.0% | +4.6% | +3.5% |
+| 10.0 m (+11.1%) | +0.0% | +6.3% | +5.2% |
+
+Within +/-1 m of planting error the error stays under 8% while the true pitch is within 5.6% of the declared one, and reaches -22% on a block 11% tighter. **A mis-declared standard is the dominant error term in a census, and nothing in the pipeline detects it.**
+
+**5. The disproof, and the disproof is what it should be.** If 140 were the model's output rather than a reading, every row above would be 140. Instead the count tracks density across a factor of three: a 7.0 m block reads 126.9 SPH, a 12.0 m block reads 79.7 SPH. And the failure mode inverts with density exactly as a fixed radius must — **under-counting on tight blocks (merging real neighbours), over-counting on wide ones (duplicate apexes surviving)**.
+
+**6. The case the owner asked for, verbatim.** A block planted at 8.0 m with 1.5 m of planting error is **180.4 SPH true and the mature standard reports 140.0 SPH** — the demo's own published number, to the decimal, for a block 28% denser. The two are not distinguishable from the number alone.
+
+**7. The demo has no ground truth, and the previous pass was comparing against the defect.** `F:\PalmSentinel-AI\output\estate_sensus_summary.json` — the file the first pass treated as *"its committed blok_tm_utara sensus CSV"* — is **V1's own export**: `total_estate_palms: 8495`, `average_sph: 610.8`, `blok_tm_utara: count 6066, area_ha 10.9064, sph 556.2, status "Very High Density / Check Crown Spacing Setting"`, with `csv_path` pointing into the Antigravity scratch directory. It is the output of the run whose over-count this project exists to fix. So: **the project contains no hand-labelled ground truth for any real imagery, and the 138 MP "agreement" was agreement with the bug.**
+
+**8. A second instrument on the demo, and its limits.** An independent detector (ExG local maxima: no tiling, no morphology, no spacing rule, no shared threshold) finds **151** candidates at a 4 m crown-scale separation against V2's 140 (+7.9%); 352 at 3 m and 473 at 2 m, which are frond-level apexes. It cannot resolve 6.75 m separations (an artefact of plateau maxima at large kernels: 63), so it **neither confirms nor refutes 140** — recorded rather than dressed up. Two further facts about the demo: the radius removes **78%** of the detector's output on it (628 raw candidates, 488 suppressed, 140 kept), which is why the demo's count moves 164->109 across the sweep while the synthetic stays flat; and the demo's own statistics are mutually inconsistent for any lattice — 140 palms on 1.0000 ha implies a 9.08 m pitch, while the reported median nearest-neighbour is 7.40 m, which would be 210.9 SPH. The demo therefore cannot serve as a validation target either. It is a tuning surface.
+
+**Verdict: the fraction survives as agronomic reasoning, and its justification was replaced.** Value unchanged at 0.75; the evidence:
+
+* **At the declared pitch it is the truth on independent ground truth** — 142.5 SPH recovered against a true 142.5 at 1.0 m planting error (0.00%), +0.64% on a surveyed lattice, -1.72% at 1.5 m.
+* **The fraction is not producing the answer** — a plateau from 0.70 to 0.85 rather than a monotone slide.
+* **The value is derivable from the standards, not merely observed** — the radius must sit above the palm's own apex structure (bounded by `ROSETTE_RADIUS_SEARCH_M` at ~4 m) and below the true nearest-neighbour spacing of the 9.0 x 7.8 m pattern (7.8 m, or 9.0 m read as a triangular pitch). 6.75 m is inside that window on both sides.
+
+`agronomy.py`'s `min_spacing_fraction` docstring was rewritten accordingly: the circular demo paragraph is gone, replaced by the standards derivation, the measured defence, the domain, and the open question. **No threshold value changed.**
+
+**What this does not settle, recorded rather than hidden.** 0.70 has the *smaller* worst case across an 8-10 m band (**6.9% against 13.5%**), because on a tight block 6.75 m is within one apex-localisation error of the true nearest-neighbour spacing. 0.75 is kept because on real imagery the radius does most of its work suppressing frond-structure apexes (628 -> 140), and a uniform synthetic crown — one bud per palm — cannot measure that side of the trade. The fraction is therefore known to about **+/-0.05**, and closing that needs a hand-labelled real patch, which does not exist. Moving it on the strength of this fixture alone would be substituting a model for the thing it models.
+
+**Files modified:** `palmsentinel/agronomy.py` (docstring only), `tests/ground_truth.py` (extended), `tests/test_ground_truth.py` (new), `README.md` (V2 columns relabelled; new "Is the number true?" section; domain bullet; test count 43 -> 70), this log.
+**Not modified:** any threshold value; no pipeline, detection, tiling, web, desktop or launcher code; no feature and no UI change (explicitly out of scope for this pass).
+
+**Verification.** `python -m unittest discover -s tests` -> **70 tests, OK (50.4 s)**, of which 12 are new. `python tests/ground_truth.py` reproduces every table above -> exit 0, all seven sections, **3m30s**.
+
+One defect was found in this pass's own deliverable, by running the command rather than reading it: `python tests/ground_truth.py` — the form promised by the module's docstring and by the README — died with `ModuleNotFoundError: No module named 'palmsentinel'`, because the script form puts `tests/` on `sys.path` and not the repository root; the earlier tables had only ever been produced under `PYTHONPATH=.`. Fixed in the module (the root is added explicitly rather than documented as a PYTHONPATH the caller must remember), and the script form is what produced the numbers quoted above. A second defect was found the same way: the script's pitch table was still printing the *crown-scaled* sweep while the README and this entry publish the *crown-real* one, so "reproduces every table" would have been false; the script now prints the real-palm axis and the band table, and every fraction -> error pair it prints was checked against the rows published above (0.50 +4.49%, 0.60 +3.21%, 0.65 +1.28%, 0.70 +0.64%, 0.75 +0.64%, 0.80 +0.00%, 0.85 +0.00%, 0.90 -6.41%, 0.95 -29.49%, 1.00 -48.08%). `python -m palmsentinel.cli census --image data/demo_palm_estate.jpg --gsd 4.0` -> **140 palms, 140.0 SPH, 1.0000 ha, optimal**, closest accepted pair 169.5 px against 168.8 px required — **unchanged**, because no value moved. The 138 MP figure (1,360 palms / 124.7 SPH on 10.9064 ha) is **not** re-run this pass: its ROI polygon lives in an earlier pass, no code that produces it changed, and per finding 7 it has no ground truth to be checked against anyway. `F:\PalmSentinel-AI` remains unmodified and read-only (`git status --porcelain` empty at `cd0c22e`).

@@ -139,7 +139,8 @@ UI — it reads the rendered numbers back out of the page.
 Tests:
 
 ```
-python -m unittest discover -s tests     # 43 tests, no imagery or network needed
+python -m unittest discover -s tests     # 70 tests, ~50 s, no imagery or network needed
+python tests/ground_truth.py             # the true-versus-recovered tables, ~3.5 min
 ```
 
 The comparison against V1 is **optional and not self-contained**: it imports the
@@ -173,6 +174,65 @@ V1's count to 0.96x — same tiles, same suppression, same image — which ident
 the over-count as a calibration defect rather than a pipeline one, and explains
 why a self-referential audit could not see it.
 
+**The V2 column is a measurement, not a verified truth.** Neither block has an
+independent ground truth: `estate_sensus_summary.json` in the predecessor's
+`output/` is V1's *own* export — it is the run that reports 556.2 SPH — and the
+demo mosaic carries no labels. 140 and 124.7 are consistent with a mature block
+planted to the estate standard. They are not evidence of one. What can be said
+instead is below.
+
+## Is the number true?
+
+The exclusion radius is 0.75 of the standard's declared pitch, and it was chosen
+while the demo's result was being watched — which is indistinguishable, from
+outside, from a value fitted to one image. So the count is graded against a
+triangular plantation whose density is arithmetic and which contains **nothing
+from the pipeline**: known pitch, known palm coordinates, and a survey patch chosen
+by geometry alone. Full tables: `python tests/ground_truth.py`.
+
+Mature standard declared, palm size held at a real mature crown:
+
+| true pitch (planting error) | true SPH | recovered SPH | error |
+| --- | ---: | ---: | ---: |
+| 9.0 m (0.0 m) | 142.6 | 143.5 | +0.6% |
+| **9.0 m (1.0 m)** | **142.5** | **142.5** | **+0.0%** |
+| 9.0 m (1.5 m) | 142.6 | 140.1 | −1.7% |
+| 8.0 m (0.0 m) | 180.4 | 180.4 | +0.0% |
+| 10.0 m (0.0 m) | 115.4 | 115.4 | +0.0% |
+| 12.0 m (0.0 m) | 79.7 | 79.7 | +0.0% |
+| 8.0 m (1.5 m) | 180.4 | 140.0 | **−22.4%** |
+
+Four things follow.
+
+**The count is a reading, not a constant.** Densities 2.3x apart come back as
+they are, and where the standard is declared correctly the answer is the truth to
+within a fraction of a percent. The last row is the warning that comes with it: a
+block 28% denser than the demo reports **140.0 SPH — the demo's own number**. From
+the number alone the two cannot be told apart.
+
+**The fraction is not producing the answer.** Recovered SPH as the fraction moves,
+on a surveyed lattice: 0.50 → +4.5%, 0.70 → +0.6%, 0.75 → +0.6%, 0.80 → +0.0%,
+0.85 → +0.0%, 0.90 → −6.4%, 1.00 → −48%. There is a flat window from 0.70 to 0.85
+and then a cliff, where the radius starts swallowing genuine neighbours. A fitted
+constant slides across the whole range; this one has a plateau, and 0.75 sits
+inside it rather than on its edge.
+
+**The area is not inheriting a hidden constant either.** Tiling changes the count
+by nothing at all (512 px against whole-image: identical), and the ground sample
+distance changes the density by at most 1.3% across 2–8 cm/px — which matters
+twice over, because area scales with GSD squared.
+
+**The domain is the declared standard, and that is the dominant error term.** The
+radius is a fraction of the pitch the caller *declares*: with ±1 m of planting
+error the error stays under 8% while the true pitch is within 5.6% of the declared
+one, and reaches −22% on a block 11% tighter (a 7.0 m block read as mature: −46%).
+Nothing in the census detects a mis-declared standard. The fraction itself is known
+to no better than about ±0.05: 0.70 has the smaller worst case across an 8–10 m
+band (6.9% against 13.5%), but on real imagery the radius does most of its work
+suppressing frond apexes — 628 raw candidates become 140 on the demo — and a
+uniform synthetic crown cannot measure that side of the trade. 0.75 therefore
+stands, and settling the last 0.05 needs a hand-labelled real patch.
+
 ## Layout
 
 | Path | Responsibility |
@@ -193,6 +253,7 @@ why a self-referential audit could not see it.
 | `Launch_PalmSentinel.bat`, `.ps1` | The double-click entry points: prefer the packaged build, otherwise preflight Python and name whatever is missing. |
 | `PalmSentinelV2.spec` | The standalone build's recipe. |
 | `dist/PalmSentinelV2/` | The standalone build itself (not tracked, ~196 MB). Carries `_internal/` plus a writable `data/` alongside. |
+| `tests/` | The suite, plus `ground_truth.py`: the true-versus-recovered sweeps behind [Is the number true?](#is-the-number-true). |
 
 `paths.py` draws one line deliberately: assets (`templates/`, `static/`, the demo
 image) are read-only and live inside the bundle, while the imagery library is
@@ -223,6 +284,11 @@ invariant held.
   than shipped wrong.
 - Every figure scales from the ground sample distance, and nothing in the imagery
   verifies the GSD you enter. A wrong GSD gives a wrong area and a wrong density.
-- Counting accuracy is validated against a synthetic plantation of exactly known
-  density and against the industry 136–143 SPH band, not against a hand-labelled
-  ground truth of the estate, which does not exist.
+- No hand-labelled ground truth exists for the estate imagery, so the published
+  demo and 138 MP figures are measurements consistent with the standard, not
+  verified counts. The model behind them is validated against a synthetic
+  plantation of exactly known density ([above](#is-the-number-true)), which pins
+  the exclusion fraction to about ±0.05 and cannot pin it further.
+- The census cannot tell whether you declared the right planting standard. A
+  mature block planted tighter than its declared 9 m is undercounted — by 13% at
+  8 m with ordinary planting error. Pass the standard that matches the block.
