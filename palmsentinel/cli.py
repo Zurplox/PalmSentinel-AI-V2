@@ -97,6 +97,7 @@ def cmd_census(args: argparse.Namespace) -> int:
         index=args.index,
         vegetation_threshold=args.threshold,
         min_spacing_px=args.min_spacing_px,
+        scale_from_image=args.scale_from_image,
     )
     result = run_census(image, config)
     _print_result(result)
@@ -178,6 +179,9 @@ def build_parser() -> argparse.ArgumentParser:
                         help="Override the Otsu vegetation threshold (index units)")
     census.add_argument("--min-spacing-px", type=float, default=None,
                         help="Diagnostic override; bypasses metre-derived spacing")
+    census.add_argument("--scale-from-image", action="store_true",
+                        help="Problem 5: measure the planting pitch from the image "
+                             "so the count cannot depend on --gsd (opt-in)")
     census.add_argument("--json", default=None, help="Write a full JSON report")
     census.set_defaults(func=cmd_census)
 

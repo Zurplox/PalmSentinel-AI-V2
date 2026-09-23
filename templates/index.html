@@ -178,6 +178,7 @@
           <input class="range" id="input-threshold" type="range" min="0" max="100" step="5" value="0">
         </label>
         <p class="note">Sensitivity 0 resolves the vegetation threshold with Otsu. Higher sensitivity lowers the ExG threshold to catch weaker crowns — watch “rejected by spacing” in the quality panel; if it climbs past ~80%, sensitivity is too high.</p>
+        <label class="check"><input type="checkbox" id="chk-scale-image"><span title="Measure the planting pitch from the image itself, so the palm count cannot depend on the typed GSD. The typed GSD is then used for area and density only.">Count independent of typed GSD</span></label>
       </details>
     </section>
 
@@ -185,7 +186,7 @@
       <h2 class="group__title"><span class="group__n">6</span>Overlays</h2>
       <label class="check"><input type="checkbox" id="chk-palms" checked><span>Palm markers</span></label>
       <label class="check"><input type="checkbox" id="chk-ids"><span>Palm identifiers</span></label>
-      <label class="check"><input type="checkbox" id="chk-exclusion"><span>Minimum-spacing circles</span></label>
+      <label class="check"><input type="checkbox" id="chk-exclusion"><span title="Half the minimum-spacing floor around each palm: two touching circles sit exactly at the floor, so overlap would mean a violation">Merge-radius circles</span></label>
       <label class="check"><input type="checkbox" id="chk-minimap" checked><span>Overview navigator</span></label>
       <label class="check"><input type="checkbox" id="chk-edges" checked><span>Ground distances on ROI edges</span></label>
     </section>
@@ -317,6 +318,7 @@
               <tr><th>Closest accepted pair</th><td class="mono" id="q-closest">—</td></tr>
               <tr><th>Tiles processed</th><td class="mono" id="q-tiles">—</td></tr>
               <tr><th>Vegetation threshold</th><td class="mono" id="q-threshold">—</td></tr>
+              <tr><th>Image-measured pitch</th><td class="mono" id="q-pitch">—</td></tr>
               <tr><th>Apical rosette radius</th><td class="mono" id="q-rosette">—</td></tr>
               <tr><th>Elapsed</th><td class="mono" id="q-elapsed">—</td></tr>
             </tbody>

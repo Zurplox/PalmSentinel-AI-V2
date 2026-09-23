@@ -17,9 +17,9 @@ Full analysis, numbers and evidence: [`SYSTEM_LIVING_LOG_V2.md`](SYSTEM_LIVING_L
 
 ### The packaged build — needs nothing installed
 
-**[Download the standalone Windows build (v2.0.5)](https://github.com/Zurplox/PalmSentinel-AI-V2/releases/latest)**
-— `PalmSentinelV2-win64.zip`, 82,925,583 bytes (~79 MB), sha256
-`5c3e2b7ea28cee3190a101a31460219bfaf83868df29a5dfae241b067885e1d1`. Unzip it anywhere and run
+**[Download the standalone Windows build (v2.0.6)](https://github.com/Zurplox/PalmSentinel-AI-V2/releases/latest)**
+— `PalmSentinelV2-win64.zip`, 82,932,362 bytes (~79 MB), sha256
+`6bfd693c1e989bf43badd08460d7448aa3e2f210b07516038b1bfe5755fdcdf1`. Unzip it anywhere and run
 `PalmSentinelV2.exe` from inside; the bundled demo orthomosaic loads on first run,
 so the first census works with nothing else installed. Windows SmartScreen may warn
 about an unknown publisher, because the build is not code-signed.
@@ -148,7 +148,7 @@ UI — it reads the rendered numbers back out of the page.
 Tests:
 
 ```
-python -m unittest discover -s tests     # 91 tests, ~70 s, no imagery or network needed
+python -m unittest discover -s tests     # 101 tests, ~80 s, no imagery or network needed
 python tests/ground_truth.py             # the true-versus-recovered tables, ~3.5 min
 ```
 
@@ -169,6 +169,39 @@ checkout it exits 1 with a message saying so.
 ```
 python tools/compare_v1_v2.py --v1-root path/to/PalmSentinel-AI
 ```
+
+## Controls that change the answer
+
+Each of these is labelled with what it actually does.
+
+* **Detection sensitivity** (Advanced, 0–100%): 0 is plain Otsu. A positive value
+  lowers the region's vegetation threshold by that fraction of the interval
+  between the Otsu bar and the region's background level, resolved once for the
+  whole survey, so weaker crowns still read as palms. Higher means more palms,
+  never fewer; if "suppressed by spacing" passes ~80% in the quality panel, it is
+  too high. The slider sends only that fraction. An absolute threshold is for
+  scripts — `threshold` in `POST /api/census`, `--threshold` on the CLI — and when
+  both arrive, the absolute value is the one used.
+* **Ground sample distance, in metres or centimetres** (two fields, one stored
+  value), with an **estimated flight altitude** beside it for the current
+  resolution (≈ GSD × 3040 for a 20 MP / 84° FOV camera). The altitude is a
+  cross-check against the drone log, not a measurement. **Calibrate GSD** solves
+  the resolution from a trusted area instead: pixels² × GSD² = area, so the
+  corrected GSD is the current one scaled by √(declared ÷ measured).
+* **Count independent of typed GSD** (Advanced, off by default): measures the
+  planting pitch from the imagery's own canopy periodicity and derives the
+  detector's pixel parameters from it, so the integer count cannot depend on the
+  GSD you typed. Area and density are then anchored by the declared standard, and
+  the typed-GSD density is reported beside it — a disagreement past 15% is named
+  in the quality panel rather than resolved silently. On synthetic plantations at
+  7 / 9 / 12 m the count lands within −0.7% / +0.6% / +1.2% (typed-GSD path:
+  −45.8% / +0.0% / +7.5%), and the same image censused at 2, 4 and 8 cm/px gives
+  the same integer count. On the bundled demo it measures a 4.42 m pitch and
+  reports 540 palms / 130.1 SPH against the typed path's 140 / 140.0, with the
+  disagreement flag firing: the demo's palms are not on the mature 9 m grid the
+  typed path assumes. That is the control doing its job, not a defect — which of
+  the two is right depends on the declared standard, and no census can verify
+  that. It stays off by default for exactly that reason.
 
 ## The numbers
 

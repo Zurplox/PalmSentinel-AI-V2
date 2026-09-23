@@ -213,6 +213,42 @@ class DetectorParams:
             index=index,
         )
 
+    @classmethod
+    def from_measured_pitch(
+        cls,
+        standard: PalmStandard,
+        pitch_px: float,
+        index: str = "exg",
+    ) -> "DetectorParams":
+        """Pixel parameters from an image-measured pitch (Problem 5).
+
+        Identical proportions to :meth:`from_standard`, but the ruler is a
+        pitch measured from the imagery itself
+        (:mod:`palmsentinel.pitch`) instead of metres divided by a typed GSD.
+        The integer count this produces cannot depend on the typed GSD; the
+        GSD is applied afterwards, for area and density only.  ``pitch_px``
+        must be positive and finite; anything else is a caller error.
+        """
+        if not (pitch_px > 0.0) or not math.isfinite(pitch_px):
+            raise ValueError(f"Measured pitch must be positive pixels, got {pitch_px!r}")
+        ex = standard.expected_spacing_m
+        peak_sep = max(3, int(round(pitch_px * standard.peak_separation_m / ex)))
+        rosette_r_min = max(1.0, pitch_px * ROSETTE_RADIUS_SEARCH_M[0] / ex)
+        rosette_r_max = max(rosette_r_min, pitch_px * ROSETTE_RADIUS_SEARCH_M[1] / ex)
+        blur = max(3, int(round(pitch_px * standard.blur_m / ex)))
+        if blur % 2 == 0:
+            blur += 1
+        halo = int(math.ceil(rosette_r_max)) + peak_sep + 8
+        return cls(
+            blur_ksize=blur,
+            peak_separation_px=peak_sep,
+            min_spacing_px=float(standard.min_spacing_fraction * pitch_px),
+            rosette_radius_min_px=rosette_r_min,
+            rosette_radius_max_px=rosette_r_max,
+            halo_px=halo,
+            index=index,
+        )
+
     def describe(self) -> str:
         return (
             f"blur={self.blur_ksize}px peak_sep={self.peak_separation_px}px "

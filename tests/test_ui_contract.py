@@ -295,3 +295,23 @@ class TestOverlaySemanticsContract(unittest.TestCase):
         import inspect
         source = inspect.getsource(census)
         self.assertIn('body.get("sensitivity")', source)
+
+    def test_the_slider_sends_the_fraction_and_not_an_absolute_bar(self):
+        """One knob. The endpoint prefers an absolute threshold over the
+        fraction, so a slider that patched both would make the labelled
+        percentage the ignored value -- which is exactly the state this check
+        was written against."""
+        panels_js = (JS_DIR / "panels.js").read_text(encoding="utf-8")
+        # Bound the handler by its own closing brace. Slicing at the first
+        # "});" would stop inside the first patch call and see nothing else.
+        match = re.search(
+            r"input-threshold'\]\.addEventListener.*?\n    \}\);", panels_js, re.S
+        )
+        self.assertIsNotNone(match, "the sensitivity slider handler was not found")
+        handler = match.group(0)
+        self.assertIn("sensitivity: value / 100", handler)
+        self.assertNotIn("threshold: value", handler)
+        main_js = (JS_DIR / "main.js").read_text(encoding="utf-8")
+        self.assertNotIn("threshold: state.threshold", main_js)
+        state_js = (JS_DIR / "state.js").read_text(encoding="utf-8")
+        self.assertNotIn("threshold: 0", state_js)

@@ -340,6 +340,7 @@ def census() -> Response:
             tile_px=max(256, min(tile_px, 8192)),
             vegetation_threshold=float(threshold) if threshold is not None else None,
             sensitivity=max(0.0, min(sensitivity, 1.0)),
+            scale_from_image=bool(body.get("scale_from_image", False)),
             manual_additions=_parse_points(body.get("manual_add")),
             manual_removals=_parse_points(body.get("manual_remove")),
         )
@@ -418,6 +419,16 @@ def _census_payload(result: CensusResult) -> Dict[str, Any]:
             "peak_separation_px": result.params.peak_separation_px,
             "min_spacing_px": round(result.params.min_spacing_px, 2),
             "halo_px": result.params.halo_px,
+        },
+        "scale": {
+            "measured_pitch_px": (
+                round(float(diagnostics.get("measured_pitch_px")), 2)
+                if diagnostics.get("measured_pitch_px") is not None else None
+            ),
+            "measured_m_per_px": diagnostics.get("measured_m_per_px"),
+            "pitch_estimation_ok": bool(diagnostics.get("pitch_estimation_ok")),
+            "sph_typed_gsd": diagnostics.get("sph_typed_gsd"),
+            "gsd_disagreement": diagnostics.get("gsd_disagreement"),
         },
         "used_polygon": bool(diagnostics.get("polygon_used")),
     }

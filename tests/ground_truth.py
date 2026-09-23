@@ -88,6 +88,8 @@ class Recovery:
     area_ha: float
     recovered: int
     recovered_sph: float
+    measured_pitch_px: Optional[float] = None
+    """Image-measured pitch, when the census ran on Problem 5's opt-in path."""
 
     @property
     def count_error(self) -> float:
@@ -141,6 +143,7 @@ def recover(
     cols: int = 14,
     rows: int = 14,
     seed: int = 7,
+    scale_from_image: bool = False,
 ) -> Recovery:
     """
     Plant a grid of known density, census it, and report both numbers.
@@ -175,6 +178,7 @@ def recover(
             scale=scale,
             polygon=roi_polygon_px(roi, origin, scale),
             tile_px=tile_px,
+            scale_from_image=scale_from_image,
         ),
     )
     return Recovery(
@@ -190,6 +194,7 @@ def recover(
         area_ha=area_ha,
         recovered=result.total_palms,
         recovered_sph=result.sph,
+        measured_pitch_px=result.diagnostics.get("measured_pitch_px"),
     )
 
 
@@ -410,6 +415,20 @@ def main() -> int:
     )
     for item in pitch_floor_and_ceiling():
         _row(item)
+
+    _head(
+        "8. PROBLEM 5: the same disproof with the pitch measured from the image",
+        "row (measured = image pitch in px; typed GSD still 4 cm/px)",
+    )
+    for pitch in (7.0, 9.0, 12.0):
+        old = recover(pitch, jitter_m=1.0, crown_pitch_m=STANDARD_PITCH_M)
+        new = recover(pitch, jitter_m=1.0, crown_pitch_m=STANDARD_PITCH_M,
+                      scale_from_image=True)
+        _row(old, tag="typed-gsd")
+        _row(new, tag="from-image")
+        mp = new.measured_pitch_px
+        print(f"  {'':<12} measured pitch: "
+              f"{'-' if mp is None else f'{mp:.1f} px = {mp * 0.04:.2f} m @4cm/px'}")
 
     return 0
 

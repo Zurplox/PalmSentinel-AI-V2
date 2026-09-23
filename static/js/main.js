@@ -237,8 +237,8 @@ async function runCensus() {
       standard: state.standardKey,
       gsd_cm: state.gsdCm,
       tile_px: state.tilePx,
-      threshold: state.threshold > 0 ? state.threshold : null,
       sensitivity: state.sensitivity > 0 ? state.sensitivity : 0,
+      scale_from_image: Boolean(state.scaleFromImage),
       manual_add: state.manualAdd,
       manual_remove: state.manualRemove,
     };

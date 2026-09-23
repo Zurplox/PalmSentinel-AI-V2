@@ -56,8 +56,8 @@ export const initialState = {
   // run parameters
   blockName: 'Blok 1',
   tilePx: 1536,
-  threshold: 0,            // 0 means "derive with Otsu"
   sensitivity: 0,          // 0..1, lowers the Otsu bar to catch weaker crowns
+  scaleFromImage: false,   // Problem 5 opt-in: pitch measured from the image
 
   // results
   census: null,

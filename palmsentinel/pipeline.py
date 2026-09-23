@@ -42,7 +42,9 @@ from .detection import (
     DetectorParams,
     Observation,
     observe_region,
+    vegetation_index,
 )
+from .pitch import estimate_pitch_px
 from .scale import GroundScale, ImageFrame, bounds_of, shoelace_area_px
 from .tiling import Tile, assert_exact_cover, core_contains, plan_tiles
 
@@ -111,6 +113,12 @@ class CensusConfig:
     in the comparison harness; a normal census leaves this ``None`` so spacing
     comes from metres."""
 
+    scale_from_image: bool = False
+    """Problem 5 opt-in: measure the planting pitch from the imagery and derive
+    pixel parameters from it, so the integer count cannot depend on the typed
+    GSD.  The typed GSD is then used for area/density only, with both densities
+    reported side by side.  Default off, which is byte-identical behaviour."""
+
     def resolved_min_spacing_px(self, params: DetectorParams) -> float:
         return (
             float(self.min_spacing_px)
@@ -145,6 +153,9 @@ class CensusResult:
             f"detector         : {self.params.describe()}",
             f"observation      : {self.observation.describe()}",
             f"min spacing      : {self.min_spacing_px:.1f} px "
+            f"({self.params.index} from image-measured pitch)"
+            if d.get("pitch_estimation_ok") else
+            f"min spacing      : {self.min_spacing_px:.1f} px "
             f"({self.params.index} derived from metres)",
             f"tiles            : {d.get('tiles')} planned, "
             f"{d.get('tiles_with_candidates')} with candidates",        f"apex candidates  : {d.get('candidates_raw'):,} raw",
@@ -165,6 +176,14 @@ class CensusResult:
                 f"palm spacing     : nearest neighbour median "
                 f"{d.get('nn_median_m', 0):.2f} m (mode {d.get('nn_mode_m', 0):.2f} m), "
                 f"10-90% {d.get('nn_p10_m', 0):.2f}-{d.get('nn_p90_m', 0):.2f} m"
+            )
+        if d.get("pitch_estimation_ok") and d.get("measured_pitch_px"):
+            lines.append(
+                f"pitch (image)    : {d['measured_pitch_px']:.1f} px "
+                f"({d.get('measured_m_per_px', 0):.4f} m/px); SPH typed-GSD "
+                f"{d.get('sph_typed_gsd')} vs measured {self.sph:,.1f}"
+                + ("  <-- SCALE DISAGREEMENT, verify GSD and standard"
+                   if d.get("gsd_disagreement") else "")
             )
         lines.append(
             f"spacing check    : closest accepted pair "
@@ -337,7 +356,6 @@ def run_census(image_bgr: ArrayLike, config: CensusConfig) -> CensusResult:
     started = time.perf_counter()
 
     h_img, w_img = image_bgr.shape[:2]
-    frame = ImageFrame(width=w_img, height=h_img, scale=config.scale)
     image_bounds = (0, 0, w_img, h_img)
 
     polygon = tuple(config.polygon) if config.polygon else None
@@ -354,6 +372,34 @@ def run_census(image_bgr: ArrayLike, config: CensusConfig) -> CensusResult:
 
     if region[2] - region[0] < 8 or region[3] - region[1] < 8:
         raise EmptyRegionError(f"Region too small to census: {region}")
+
+    # Problem 5 (opt-in): the ruler for detection is measured from the region
+    # itself, never from the typed GSD.  A manual pixel override still wins
+    # (auditability), and an unmeasurable region falls back to typed metres
+    # with that fact recorded rather than hidden.
+    measured_pitch_px: Optional[float] = None
+    if config.scale_from_image and config.min_spacing_px is None:
+        rx0, ry0, rx1, ry1 = region
+        view = image_bgr[max(0, ry0):ry1, max(0, rx0):rx1]
+        if view.size > 0:
+            measured_pitch_px = estimate_pitch_px(
+                vegetation_index(view, config.index)
+            )
+    if measured_pitch_px is not None:
+        params = DetectorParams.from_measured_pitch(
+            config.standard, measured_pitch_px, config.index
+        )
+        use_scale = GroundScale(
+            config.standard.expected_spacing_m / measured_pitch_px * 100.0
+        )
+    else:
+        params = DetectorParams.from_standard(
+            config.standard, config.scale, config.index
+        )
+        use_scale = config.scale
+    pitch_ok = measured_pitch_px is not None
+
+    frame = ImageFrame(width=w_img, height=h_img, scale=use_scale)
 
     # 1. one region-wide measurement context
     observation = observe_region(image_bgr, region, index=config.index)
@@ -381,7 +427,6 @@ def run_census(image_bgr: ArrayLike, config: CensusConfig) -> CensusResult:
             sensitivity=float(config.sensitivity),
         )
 
-    params = DetectorParams.from_standard(config.standard, config.scale, config.index)
     min_spacing_px = config.resolved_min_spacing_px(params)
     detector = CanopyDetector(params, observation)
 
@@ -459,15 +504,15 @@ def run_census(image_bgr: ArrayLike, config: CensusConfig) -> CensusResult:
 
     for i, c in enumerate(sorted(kept, key=lambda a: (a.y, a.x)), start=1):
         radius_px = detector.rosette_radius_px(image_bgr, c.x, c.y)
-        radius_m = config.scale.px_to_m(radius_px)
+        radius_m = use_scale.px_to_m(radius_px)
         rosette_radii_m.append(radius_m)
         palms.append(
             Palm(
                 palm_id=i,
                 x_px=c.x,
                 y_px=c.y,
-                x_m=config.scale.px_to_m(c.x),
-                y_m=config.scale.px_to_m(c.y),
+                x_m=use_scale.px_to_m(c.x),
+                y_m=use_scale.px_to_m(c.y),
                 peak_exg=c.peak,
                 rosette_radius_px=radius_px,
                 rosette_radius_m=radius_m,
@@ -475,19 +520,38 @@ def run_census(image_bgr: ArrayLike, config: CensusConfig) -> CensusResult:
             )
         )
 
-    # 6. area and density, from the one scale object and the one band table
+    # 6. area and density, from the one scale object and the one band table.
+    # Under Problem 5 the scale object is image-measured; the typed GSD then
+    # gets its own side-by-side density so a mistyped GSD shows up as a
+    # disagreement instead of silently moving the count.
     if polygon is not None:
-        area_ha = config.scale.px_area_to_ha(shoelace_area_px(polygon))
+        area_ha = use_scale.px_area_to_ha(shoelace_area_px(polygon))
     else:
         area_ha = frame.full_area_ha
 
     sph = (len(palms) / area_ha) if area_ha > 0 else 0.0
     band = classify_sph(sph)
 
+    sph_typed_gsd: Optional[float] = None
+    gsd_disagreement: Optional[bool] = None
+    if pitch_ok:
+        typed_ha = (
+            config.scale.px_area_to_ha(shoelace_area_px(polygon))
+            if polygon is not None
+            else ImageFrame(width=w_img, height=h_img, scale=config.scale).full_area_ha
+        )
+        sph_typed_gsd = (len(palms) / typed_ha) if typed_ha > 0 else 0.0
+        # bool(...): a comparison against a numpy-derived density yields
+        # numpy's bool, which json cannot serialize -- and this flag is
+        # reported verbatim through both the API and the CLI's --json.
+        gsd_disagreement = bool(
+            abs(sph - sph_typed_gsd) / max(sph, 1e-9) > 0.15 if sph > 0 else False
+        )
+
     # 7. post-conditions (reported, not assumed)
     points = [(p.x_px, p.y_px) for p in palms]
     min_pair = minimum_pairwise_distance(points)
-    nn = nearest_neighbour_summary(points, config.scale.m_per_px)
+    nn = nearest_neighbour_summary(points, use_scale.m_per_px)
     outside = 0
     if polygon is not None:
         poly_np = np.array(polygon, dtype=np.float32)
@@ -515,7 +579,7 @@ def run_census(image_bgr: ArrayLike, config: CensusConfig) -> CensusResult:
         "manual_additions_rejected": sum(
             1 for c in manual_added if not any(c is k for k in kept)
         ),
-        "min_spacing_m": round(config.scale.px_to_m(min_spacing_px), 4),
+        "min_spacing_m": round(use_scale.px_to_m(min_spacing_px), 4),
         "min_pairwise_distance_px": min_pair,
         "spacing_invariant_ok": bool(
             len(palms) < 2 or min_pair >= min_spacing_px - 1e-6
@@ -532,6 +596,16 @@ def run_census(image_bgr: ArrayLike, config: CensusConfig) -> CensusResult:
             round(float(np.max(rosette_radii_m)), 3) if rosette_radii_m else 0.0
         ),
         "elapsed_s": elapsed,
+        "measured_pitch_px": measured_pitch_px,
+        "measured_m_per_px": round(use_scale.m_per_px, 6) if pitch_ok else None,
+        "pitch_estimation_ok": pitch_ok,
+        "pitch_requested": bool(config.scale_from_image),
+        "area_ha_typed_gsd": (
+            round(config.scale.px_area_to_ha(shoelace_area_px(polygon)), 6)
+            if (pitch_ok and polygon is not None) else None
+        ),
+        "sph_typed_gsd": round(sph_typed_gsd, 3) if sph_typed_gsd is not None else None,
+        "gsd_disagreement": gsd_disagreement,
     }
 
     return CensusResult(

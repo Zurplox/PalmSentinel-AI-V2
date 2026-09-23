@@ -48,14 +48,14 @@ export class Panels {
       'density-marker', 'density-min', 'density-ref', 'density-max', 'density-note',
       's-median', 's-mode', 's-range', 's-pitch', 'spacing-verdict', 'quality-checks',
       'q-candidates', 'q-suppressed', 'q-closest', 'q-tiles', 'q-threshold', 'q-rosette',
-      'q-elapsed', 'palm-count-hint', 'palm-rows', 'palm-table-note', 'btn-csv',
+      'q-pitch', 'q-elapsed', 'palm-count-hint', 'palm-rows', 'palm-table-note', 'btn-csv',
       'btn-geojson', 'btn-annotated', 'btn-png', 'library', 'library-list', 'library-dir',
       'shortcuts', 'toasts',
     ]) {
       e[id] = $(id);
     }
 
-    for (const input of ['chk-palms', 'chk-ids', 'chk-exclusion', 'chk-minimap', 'chk-edges']) {
+    for (const input of ['chk-palms', 'chk-ids', 'chk-exclusion', 'chk-minimap', 'chk-edges', 'chk-scale-image']) {
       e[input] = $(input);
     }
     this.#bind();
@@ -159,11 +159,19 @@ export class Panels {
       this.store.patch({ tilePx: value });
     });
 
+    // The slider owns exactly one knob: the fraction of the interval between
+    // the Otsu bar and the region background. An absolute ExG threshold stays
+    // available to scripts over the API, but the UI must send only the
+    // fraction -- the endpoint prefers an absolute value, so patching both
+    // here would silently turn the labelled percentage into the ignored one.
     e['input-threshold'].addEventListener('input', (event) => {
       const value = Number(event.target.value);
-      this.store.patch({ sensitivity: value / 100 });
       e['out-threshold'].textContent = value === 0 ? 'auto' : `${value}%`;
-      this.store.patch({ threshold: value });
+      this.store.patch({ sensitivity: value / 100 });
+    });
+
+    e['chk-scale-image'].addEventListener('change', (event) => {
+      this.store.patch({ scaleFromImage: event.target.checked });
     });
 
     e['btn-run'].addEventListener('click', () => this.actions.runCensus());
@@ -293,6 +301,7 @@ export class Panels {
     e['out-tile'].textContent = String(state.tilePx);
     e['input-threshold'].value = String(Math.round(state.sensitivity * 100));
     e['out-threshold'].textContent = state.sensitivity === 0 ? 'auto' : `${Math.round(state.sensitivity * 100)}%`;
+    e['chk-scale-image'].checked = Boolean(state.scaleFromImage);
     if (document.activeElement !== e['input-block']) e['input-block'].value = state.blockName;
 
     this.#renderStandards(state);
@@ -549,6 +558,13 @@ export class Panels {
     e['q-closest'].textContent = `${num(quality.closest_pair_px, 1)} px / ${num(quality.required_spacing_px, 1)} px`;
     e['q-tiles'].textContent = int(quality.tiles);
     e['q-threshold'].textContent = `${num(result.observation.threshold, 1)} ${result.observation.index.toUpperCase()} · background ${num(result.observation.background, 1)}`;
+    {
+      const sc = result.scale || {};
+      e['q-pitch'].textContent = sc.pitch_estimation_ok
+        ? `${num(sc.measured_pitch_px, 1)} px (${num(sc.measured_m_per_px, 4)} m/px)` +
+          (sc.gsd_disagreement ? ' — disagrees with typed GSD, verify both' : ' — agrees with typed GSD')
+        : 'off (count uses typed GSD)';
+    }
     e['q-rosette'].textContent = `${num(rosette.median_m, 2)} m median (${num(rosette.min_m, 2)}–${num(rosette.max_m, 2)} m)`;
     e['q-elapsed'].textContent = `${num(quality.elapsed_s, 2)} s`;
     e['ro-layer'].textContent = state.image ? 'full resolution' : 'preview';
