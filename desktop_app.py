@@ -3,7 +3,9 @@ PalmSentinel V2 -- native desktop window.
 
     python desktop_app.py                    open the desktop window
     python desktop_app.py --check            verify the desktop stack and exit
+                                             (--test, -v and --version are aliases)
     python desktop_app.py --selftest         drive the whole census headlessly
+    python desktop_app.py --selftest --window  the same, driven inside the real window
     python desktop_app.py --port 5123        serve on exactly this port, or refuse
 
 The window is Edge WebView2 over a local server.  Nothing is transmitted
@@ -11,11 +13,13 @@ anywhere: the vision pipeline, the census and every export run on this computer.
 
 This module owns **startup** -- the window, its geometry, the server, the port and
 the dependency preflight -- and nothing else.  Proving a build correct is a
-separate job with a separate owner (:mod:`verification`), which is why the three
+separate job with a separate owner (:mod:`verification`), which is why the
 verification flags are dispatched to it from ``__main__`` and only the flag names
 are known here.  Keeping the harnesses in this file made the entry point a second
 owner of "is this build correct", and that is the kind of duplicated ownership
-that lets the two drift apart.
+that lets the two drift apart.  Those names are declared once, in
+``VERIFICATION_FLAGS`` below, because the C# launcher decides the same question
+from its own copy of them.
 
 Three deliberate differences from the previous version's desktop shell:
 
@@ -50,6 +54,15 @@ if sys.platform == "win32":
 
 import paths
 import ports
+
+#: The flags that mean "check this build and exit" rather than "open the window".
+#:
+#: Declared once, in Python, because three places answer this question: this
+#: dispatch, ``Launcher.cs``'s ``IsCheckMode`` (frozen by decision -- see
+#: ``SYSTEM_LIVING_LOG_V2.md``) and the command list in :mod:`verification`'s
+#: docstring.  ``tests/test_harness_contract.py`` fails if the three disagree, so a
+#: flag cannot be added to one of them and forgotten in the others.
+VERIFICATION_FLAGS = ("--check", "--test", "-v", "--version", "--selftest")
 
 WINDOW_TITLE = "PalmSentinel V2"
 
@@ -185,11 +198,23 @@ def _report_fatal(message: str) -> None:
 
 
 def claim_port(argv: list[str]) -> ports.Claim:
-    """Claim the port this window will serve on, or stop with a visible message."""
+    """
+    Claim the port this window will serve on, or stop with a visible message.
+
+    Both refusals are shown the same way: ``PortUnavailable`` for a port something
+    else is holding, and the ``SystemExit`` that ``ports.requested_port`` raises
+    for a ``--port`` value that is not a usable port.  Without this the second one
+    only reaches stderr -- and a double-clicked window has no console, which is
+    the same reason the refusal above is not left to ``print`` either.
+    """
     try:
         return ports.claim(ports.requested_port(argv))
     except ports.PortUnavailable as exc:
         _report_fatal(f"[PalmSentinel] {exc}")
+        raise SystemExit(1)
+    except SystemExit as exc:
+        if str(exc):
+            _report_fatal(str(exc))
         raise SystemExit(1)
 
 
@@ -227,13 +252,13 @@ def main(argv: list[str]) -> int:
 
 if __name__ == "__main__":
     arguments = sys.argv[1:]
-    if arguments and arguments[0] in ("--check", "--test", "-v", "--version"):
+    if arguments and arguments[0] in VERIFICATION_FLAGS:
         import verification
 
+        if arguments[0] == "--selftest":
+            harness = (
+                verification.window_selftest if "--window" in arguments else verification.census_selftest
+            )
+            raise SystemExit(harness(arguments))
         raise SystemExit(verification.check())
-    if arguments and arguments[0] == "--selftest":
-        import verification
-
-        harness = verification.window_selftest if "--window" in arguments else verification.census_selftest
-        raise SystemExit(harness(arguments))
     raise SystemExit(main(arguments))

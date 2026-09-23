@@ -1,0 +1,2 @@
+[PalmSentinel] layout: source checkout; assets <REPO>; library <REPO>\data
+[PalmSentinel] Desktop stack OK -- 16 routes, assets present

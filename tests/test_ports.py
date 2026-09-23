@@ -60,6 +60,25 @@ class TestRequestedPort(unittest.TestCase):
         with self.assertRaises(SystemExit):
             ports.requested_port(["--port", "http"])
 
+    def test_a_number_that_is_not_a_port_is_refused_the_same_way(self) -> None:
+        # Measured before this existed: `--port 70000` reached `bind` and died
+        # with `OverflowError: port must be 0-65535` -- a traceback from the same
+        # flag that gives a sentence for `--port http`.  And `--port 0` was worse
+        # than noisy: the OS assigns an arbitrary free port, so the value the
+        # window announced was not the value it served on.
+        for value in ("0", "-1", "65536", "70000", "99999"):
+            with self.subTest(value=value):
+                with self.assertRaises(SystemExit) as stopped:
+                    ports.requested_port(["--port", value])
+                message = str(stopped.exception)
+                self.assertIn("[PalmSentinel]", message)
+                self.assertIn(value, message)
+                self.assertIn("65535", message)
+
+    def test_the_ends_of_the_range_are_still_accepted(self) -> None:
+        self.assertEqual(ports.requested_port(["--port", "1"]), 1)
+        self.assertEqual(ports.requested_port(["--port", str(ports.PORT_LIMIT)]), ports.PORT_LIMIT)
+
 
 class TestClaim(unittest.TestCase):
     def setUp(self) -> None:

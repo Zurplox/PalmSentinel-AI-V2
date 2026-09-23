@@ -2,7 +2,7 @@
 
 > **Living Engineering Document & Decision Record**
 > *Target Audience: Autonomous AI Agents and engineers taking over this project.*
-> *Last Updated: 2026-09-23 14:15:00 Local Time*
+> *Last Updated: 2026-09-23 15:22:00 Local Time*
 > *Active Workspace: `E:\Freebuff\Palm Sentinel (V2)`*
 > *Predecessor, read-only reference: `F:\PalmSentinel-AI` (log: `SYSTEM_LIVING_LOG.md`)*
 > *This log follows the predecessor's method exactly, under a different name.*
@@ -410,8 +410,11 @@ band edge — which is what pinned V1's results.
 ```powershell
 cd "E:\Freebuff\Palm Sentinel (V2)"
 
-# 1. Unit + invariant suite (27 tests)
+# 1. Unit + invariant suite (79 tests)
 python -m unittest discover -s tests -v
+
+# 1b. What the three harness flags print, against committed evidence (~11 s)
+python -m unittest discover -s tests -p "test_harness_contract.py"
 
 # 2. Single censuses
 python -m palmsentinel.cli census --image data/demo_palm_estate.jpg --gsd 4.0
@@ -1187,3 +1190,70 @@ All six comparisons are byte-for-byte, not "same numbers". The figures they carr
 **Verification.** Six byte-identical harness outputs (three source, three packaged) diffed against pre-refactor baselines; `python -m unittest discover -s tests` -> 70 tests OK; the release candidate extracted and self-tested outside the repository with a scrubbed `PATH`; the published asset re-downloaded and its sha256 compared to the local zip and to the digest the API reports.
 
 **One metadata correction, made rather than inherited.** The previous entry carried the heading `[2026-09-23 14:40]`, a timestamp chosen by hand rather than read from the clock, which left the log out of order -- the entry below it in that turn really happened around 14:04. It has been re-stamped to its own commit time (`2f04a08`, 14:04:37), so the headings now run chronologically and each one is traceable to a commit.
+
+### [2026-09-23 15:22] — The flag contract is committed evidence, and one refusal in it was wrong
+
+**Agent/Author:** Buffy (Freebuff). Pass requested by the owner: *"Close the gaps the audit named, in the smallest way that actually settles them. First, the 'provably unchanged' evidence currently lives in session temp files, so commit it as project evidence: golden transcripts … plus a test that fails if they drift … Second, bind the flag vocabulary across the three places that now declare it … Third, fix the one inconsistency the audit found in that same surface: `--port abc` gets a tidy refusal while an out-of-range port like 70000 produces a raw traceback … check `--port 0` does whatever you intend it to rather than leaving something bound. Fourth, add the one sentence accounting for the v2.0.1 to v2.0.2 release growth."*
+
+**1. The proof that nothing had changed lived in `%TEMP%`.** The pass before this one established "byte-identical output" by diffing against six baseline files written under the session temp directory, and nothing in the repository could reproduce that. Those transcripts are now the project's evidence:
+
+| golden | bytes | what it records |
+| --- | ---: | --- |
+| `tests/golden/check.txt` | 136 | the layout line, 16 routes, assets present |
+| `tests/golden/selftest.txt` | 787 | packaged template, stylesheet, orthomosaic, census, four export byte counts |
+| `tests/golden/window-selftest.txt` | 1,144 | the rendered figures read back out of the live DOM, and the CSV the page exported itself |
+
+`tests/test_harness_contract.py` re-runs each flag through `desktop_app.py` and fails on a single character of drift. Three placeholders keep a transcript committable -- `<REPO>`, `<PYTHON>`, `<PORT>` -- while every count, byte size, band and export figure is compared literally. The module says what these are and are not: **recordings of behaviour that was verified by hand, not independent truth**; they cannot tell you the census is right, only that nobody changed the promise unnoticed. Regenerating is deliberate and its diff is the review: `python tests/test_harness_contract.py --regenerate`.
+
+The guard was proven load-bearing rather than assumed, by breaking what it protects three ways and watching each fail:
+
+| mutation | result |
+| --- | --- |
+| the spacing of a log line in `verification.py` (exit code still 0) | `FAILED (failures=1)` -- the transcript diff, printed |
+| `--nonsense` added to the Python flag list only | `FAILED -- Launcher.cs's IsCheckMode and desktop_app.VERIFICATION_FLAGS no longer agree` |
+| `--oldname` added to the frozen `Launcher.cs` only | the same failure, naming the extra flag |
+
+All three were reverted; the module is green at 7 tests. `.gitattributes` now pins `tests/golden/*.txt` to LF, because evidence compared line by line should be the same bytes on every machine.
+
+**2. The flag vocabulary, declared three times, is now bound.** `desktop_app.VERIFICATION_FLAGS` is the single Python declaration and the dispatch is a membership test against it; `Launcher.cs`'s `IsCheckMode` and both module docstrings are watched by a test that fails when they disagree. An aliases test additionally proves `--test`, `-v` and `--version` produce exactly the `--check` transcript, which is what the docstrings claim they are. `Launcher.cs` itself is still untouched -- the 14:15 decision stands, and this test is what makes leaving its copy alone safe rather than hopeful.
+
+**3. One refusal in that surface was wrong, and one wrong value was worse than noisy.** Measured before the change:
+
+```
+--port abc     [PalmSentinel] --port needs a number, e.g. --port 5001    a sentence
+--port 70000   OverflowError: bind(): port must be 0-65535               a traceback, ports.py:155
+--port 0       opened a window on an OS-assigned port, announcing 0
+```
+
+`--port 0` is the one worth remembering: the operating system assigns an arbitrary free port, so the number the window announced was not the number it served. `ports.PORT_LIMIT` now owns the bound and `requested_port` validates the range -- one reader, so `app.py` and `desktop_app.py` cannot disagree -- and every unusable value (`abc`, a missing value, `0`, `-1`, `65536`, `70000`) is refused identically, in a sentence.
+
+On the desktop path the refusal is also *visible*: `claim_port` surfaces it through `_report_fatal`, which shows a modal dialog, because a double-clicked window has no console and that is the same treatment the taken-port refusal always had. Checked while there, because the dialog is preceded by a `print`: in a no-console build that print could have crashed before the dialog appeared. It does not -- the dialog is shown -- so nothing needed fixing. The README now states both facts, including that in the packaged build a refusal waits for you to dismiss it (the process is still alive at 25 s: that is the dialog waiting, not a hang).
+
+**4. The 2.06 MB the audit asked about, measured rather than explained away.** The v2.0.1 -> v2.0.2 growth was recorded as a number with no accounting, and an unaccounted 2 MB reads as new code. Both halves are now measured:
+
+* **Payload:** the two extracted trees hold the same **265 file names** and differ by **8,489 bytes -- the executable alone**. Nothing else moved.
+* **Archive:** re-archiving identical content with the writer used for this release reproduces the shipped sizes. Pristine content -> **85,447,363** (v2.0.3) against v2.0.2's **85,463,561**, a 16,198-byte difference for changed code; with the seeded demo inside -> **87,924,354** for v2.0.1's tree and **87,933,747** for v2.0.2's, which differ by the same 9,393 bytes and sit 2,470,186 bytes above the pristine figure, which is the demo JPEG. **v2.0.1's shipped 83,403,132 is 2,044,231 bytes below what this writer produces for identical pristine content**, so the size difference is a property of how that archive was written, not of the code it carried -- and the release list's sizes (85,884,623 / **83,403,132** / 85,463,561 / 85,447,363) show v2.0.1 as the outlier of the four. Inference boundary, stated rather than glossed: v2.0.1's own zip is no longer on disk, so its writer is identified by arithmetic, not reproduced.
+
+**5. Found while sweeping the tree before the commit: an unexplained 900 KB `%SystemDrive%` directory.** Untracked in the repository root, holding `ProgramData/Microsoft/Windows/Caches/cversions.2.db` and two `{GUID}.ver0x...db` files -- Windows API-set metadata caches, at a path built from a variable that was not expanded, so it landed in the working directory instead. It is **not written by this project**: `grep -rn SystemDrive` finds no reference in any `.py`, `.cs`, `.bat`, `.ps1` or `.md` file here. Four candidates were ruled out by measurement rather than reasoning:
+
+| candidate | probe | result |
+| --- | --- | --- |
+| loading the CLR (`pythonnet` / `clr_loader`) | `import clr; import System` from a clean directory | no stray |
+| the packaged app, headless (`--check`) | `dist/PalmSentinelV2` exe, clean cwd, normal **and** scrubbed environment | no stray, both |
+| the window path | `--selftest --window`, packaged **and** from source, clean cwd | no stray |
+| `pyinstaller` itself | clean cwd, spec by absolute path (39 s build) | no stray |
+
+The second copy, in the previous pass's `psv2-standalone` directory beside `launch.log`, is the other sighting. So it is recorded as **observed twice, reproduced never**, with the ruled-out list above rather than a guess, and `%SystemDrive%/` is now in `.gitignore` so it cannot be committed by a later sweep that does not recognise it. The stray itself was removed.
+
+**Files modified:** `ports.py` (range validation, `PORT_LIMIT`), `desktop_app.py` (the refusal surfaced, `VERIFICATION_FLAGS`, docstring), `verification.py` (docstring only), `tests/test_harness_contract.py` (new), `tests/golden/check.txt`, `tests/golden/selftest.txt`, `tests/golden/window-selftest.txt` (new), `tests/test_ports.py` (the range cases), `.gitattributes` (the goldens), `.gitignore` (the `%SystemDrive%` pattern), `README.md` (release version, size and sha256; what the port refusal does; the tests line and how to regenerate), this log.
+
+**Not modified:** `Launcher.cs` and `PalmSentinel.exe`, the pipeline, detection and tiling code, the web layer, templates, stylesheets, client scripts, every threshold, `PalmSentinelV2.spec` (a test is not shipped code, so nothing new to collect), and the previous release assets. No feature and no UI change. `F:\PalmSentinel-AI` untouched.
+
+**Verification.**
+
+* `python -m unittest discover -s tests` -> **79 tests, OK, 60 s** (was 70 tests / 48.6 s); the seven new ones are the contract module, which alone runs in 10.7 s.
+* The three source transcripts are **byte-identical to the bytes recorded before this pass's code changes** -- `--check` 186 B, `--selftest` 934 B, `--selftest --window` 1,159 B, all exit 0 -- so the port validation moved nothing the harnesses print.
+* Packaged, run from the **extracted archive** with a `PATH` of `C:\Windows\System32;C:\Windows` and no Python on it: `--check` and `--selftest` are **byte-identical to v2.0.2's packaged transcripts** modulo the install path, exit 0; a plain launch returns `140 palms / 140.0 SPH / 1.0 ha / band optimal`; and `--port 70000` opens **no window and no listener** and shows a modal `PalmSentinel V2` dialog (window class `#32770`).
+* **Release `v2.0.3`** -- `PalmSentinelV2-win64.zip`, **85,447,363 bytes**, sha256 `6c69de1bca06d0d0230a9f1e1a0b7f7d5cc2b929f66e94ba1d3a051d7be2bc4b`, from `rm -rf build dist` + `pyinstaller --noconfirm --clean PalmSentinelV2.spec` (37 s), zipped **before** the built app was ever run (264 entries, top-level `PalmSentinelV2/`, no `data/`), asset name confirmed on the API rather than assumed -- the mis-naming of the previous pass did not recur -- `/releases/latest` resolving to it, with `v2.0.0`, `v2.0.1` and `v2.0.2` left in place.
+
+**One thing deliberately not done.** A refusal on the desktop path now waits for its dialog, which is right for a double-click and wrong for a scripted launch that would rather read an exit code. Making the dialog conditional on whether a console is attached is a small change, but it moves the same behaviour a third time; it is recorded here as the next candidate rather than guessed at now.

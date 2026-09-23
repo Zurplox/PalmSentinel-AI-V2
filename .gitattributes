@@ -9,6 +9,11 @@
 *.bat text eol=crlf
 *.ps1 text eol=crlf
 
+# Golden transcripts are compared line by line against what the harnesses print.
+# Stored with the endings the comparison uses, so the committed evidence is the
+# evidence, on every machine.
+tests/golden/*.txt text eol=lf
+
 # Binaries: never converted, never diffed as text.
 *.exe binary
 *.jpg binary

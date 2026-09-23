@@ -17,9 +17,9 @@ Full analysis, numbers and evidence: [`SYSTEM_LIVING_LOG_V2.md`](SYSTEM_LIVING_L
 
 ### The packaged build — needs nothing installed
 
-**[Download the standalone Windows build (v2.0.2)](https://github.com/Zurplox/PalmSentinel-AI-V2/releases/latest)**
-— `PalmSentinelV2-win64.zip`, 85,463,561 bytes (~81 MB), sha256
-`c8eac92634979652e994b8a6423a7b3bf4ba225d43732b9501da0f2d429177f9`. Unzip it anywhere and run
+**[Download the standalone Windows build (v2.0.3)](https://github.com/Zurplox/PalmSentinel-AI-V2/releases/latest)**
+— `PalmSentinelV2-win64.zip`, 85,447,363 bytes (~81 MB), sha256
+`6c69de1bca06d0d0230a9f1e1a0b7f7d5cc2b929f66e94ba1d3a051d7be2bc4b`. Unzip it anywhere and run
 `PalmSentinelV2.exe` from inside; the bundled demo orthomosaic loads on first run,
 so the first census works with nothing else installed. Windows SmartScreen may warn
 about an unknown publisher, because the build is not code-signed.
@@ -108,6 +108,9 @@ PalmSentinelV2.exe --port 5123
 
 An explicit port is the port used, or the launch stops and says which port is in
 the way and how to change it. It is never silently swapped for a different one.
+A value that is not a usable port — `abc`, `0`, `70000` — is refused the same way,
+in a sentence naming the flag rather than a traceback from `bind`. In the packaged
+build, which has no console, a refusal is a dialog and waits to be dismissed.
 
 ### Build the packaged version
 
@@ -140,9 +143,18 @@ UI — it reads the rendered numbers back out of the page.
 Tests:
 
 ```
-python -m unittest discover -s tests     # 70 tests, ~50 s, no imagery or network needed
+python -m unittest discover -s tests     # 79 tests, ~60 s, no imagery or network needed
 python tests/ground_truth.py             # the true-versus-recovered tables, ~3.5 min
 ```
+
+`tests/test_harness_contract.py` runs `--check`, `--selftest` and
+`--selftest --window` again and compares each transcript with the committed
+evidence in `tests/golden/`, so a change to what those flags promise fails the
+suite instead of travelling unnoticed. The same test fails if the flag list in
+`Launcher.cs` and the one in `desktop_app.py` stop agreeing. Regenerate a
+transcript deliberately — `python tests/test_harness_contract.py --regenerate` —
+and read the diff. On a machine with no display or no WebView2 runtime,
+`PALMSENTINEL_SKIP_WINDOW_TESTS=1` skips the one test that opens a real window.
 
 The comparison against V1 is **optional and not self-contained**: it imports the
 predecessor's engine from a checkout of `PalmSentinel-AI` (read-only) and needs

@@ -1,0 +1,18 @@
+PalmSentinel V2 -- packaged self-test
+frozen      : False
+executable  : <PYTHON>
+assets      : <REPO>
+library     : <REPO>\data
+demo asset  : <REPO>\data\demo_palm_estate.jpg
+
+GET /                    -> 200, 19223 bytes
+GET /static/css/app.css  -> 200, 25031 bytes
+POST /api/image           -> 200, demo_palm_estate.jpg 2500x2500 @ 4.0 cm/px
+GET /api/preview         -> 200, 2656531 bytes
+POST /api/census          -> 200, 140 palms, 140.0 SPH, 1.0 ha, band optimal
+                            closest pair 169.532 px vs 168.75 px required
+POST /api/export/csv      -> 200, 10568 bytes, 140 palm rows
+POST /api/export/geojson  -> 200, 54288 bytes
+POST /api/export/annotated-> 200, 3006439 bytes
+
+RESULT: PASS -- 140 palms / 140.0 SPH matched the dev path; four exports produced output.

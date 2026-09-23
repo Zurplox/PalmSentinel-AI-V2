@@ -1,0 +1,17 @@
+PalmSentinel V2 -- window self-test
+frozen      : False
+project     : PalmSentinel V2
+
+document.title          : 'PalmSentinel V2 — Drone Oil Palm Census'
+window.location.href    : 'http://127.0.0.1:<PORT>/'
+header file name        : 'demo_palm_estate.jpg'
+header file meta        : '2,500 × 2,500 px · 6.2 MP · 4.00 cm/px'
+palms (rendered)        : '140'
+area  (rendered)        : '1.0000 ha'
+SPH   (rendered)        : '140.0'
+band  (rendered)        : 'Optimal plantation density (126-146)'
+palm table rows         : 140
+quality checks          : 'is-ok: No two palms are closer than the 6.750 m spacing floor. | is-ok: Every palm lies inside the survey region. | is-ok: Rosette radius is measured per palm (0.56–3.60 m), not assigned a constant. | is-ok: Region covered by 4 tiles whose cores partition it exactly, so no palm can be counted twice at a seam.'
+CSV export (from page)  : '{"status":200,"bytes":10568,"rows":140,"header":"palm_id,block,source,x_px,y_px,x_m,y_m,peak_exg,rosette_radius_px,rosette_radius_m"}'
+
+RESULT: PASS -- the window rendered 140 palms / 140.0 SPH over 1.0000 ha, and the page exported the CSV itself.

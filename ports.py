@@ -38,6 +38,11 @@ from typing import Optional, Sequence
 #: The port everyone expects, and the one the README documents.
 DEFAULT_BASE_PORT = 5000
 
+#: The largest port a socket can bind.  Above this, ``bind`` raises
+#: ``OverflowError`` rather than an ``OSError``, so ``--port`` validates the range
+#: itself to keep the refusal a sentence.
+PORT_LIMIT = 65535
+
 #: How far above the base port to look before giving up.  Fifty consecutive busy
 #: ports is not a busy machine, it is a mistake -- and silently walking to some
 #: arbitrary high port would be worse than saying so.
@@ -92,14 +97,28 @@ def requested_port(argv: Sequence[str]) -> Optional[int]:
     Read ``--port N`` out of a command line, or return ``None``.
 
     One reader, so ``app.py`` and ``desktop_app.py`` cannot disagree about what
-    the flag means or how it fails.
+    the flag means or how it fails: every unusable value is refused the same way,
+    in a sentence rather than a traceback.
+
+    The range is checked here rather than left to ``bind``, which raises
+    ``OverflowError: port must be 0-65535`` for anything above the limit.  Port 0
+    is refused with the rest: the operating system would assign an arbitrary free
+    port, which is the opposite of what ``--port`` promises.  Without the flag the
+    search behaviour is unchanged -- that is what claiming the base port upward is
+    for.
     """
     if "--port" not in argv:
         return None
     try:
-        return int(argv[list(argv).index("--port") + 1])
+        value = int(argv[list(argv).index("--port") + 1])
     except (IndexError, ValueError):
         raise SystemExit("[PalmSentinel] --port needs a number, e.g. --port 5001")
+    if not 1 <= value <= PORT_LIMIT:
+        raise SystemExit(
+            f"[PalmSentinel] {value} is not a usable port; --port takes a number "
+            f"between 1 and {PORT_LIMIT}, e.g. --port 5001"
+        )
+    return value
 
 
 def _lock_path(port: int) -> str:

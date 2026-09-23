@@ -34,3 +34,10 @@ launcher.log
 
 # Agent/editor scratch that belongs to the machine, not the project.
 .freebuff/
+
+# A `%SystemDrive%` directory of Windows API-set cache files appears in the
+# working directory of the build or of the packaged app, under conditions not yet
+# identified (see SYSTEM_LIVING_LOG_V2.md, 2026-09-23 15:22).  It is not written
+# by this project -- `grep SystemDrive` finds nothing here -- and it is 900 KB of
+# nothing, so it is ignored rather than swept up by a careless commit.
+%SystemDrive%/

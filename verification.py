@@ -2,6 +2,7 @@
 Verification harnesses -- does this build prove itself?
 
     python desktop_app.py --check                 the desktop stack is present
+                                                  (--test, -v and --version are the same flag)
     python desktop_app.py --selftest              census + exports, headless
     python desktop_app.py --selftest --window     the same, through the real window
 
