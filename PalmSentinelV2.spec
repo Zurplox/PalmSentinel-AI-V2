@@ -50,6 +50,9 @@ datas = [
 ]
 
 hiddenimports = [
+    # Dispatched to from __main__ for --check/--selftest, which only ever run in
+    # the shipped binary; a build without it would fail on exactly those flags.
+    'verification',
     # pywebview resolves its toolkit and HTTP server dynamically.
     'webview.platforms.edgechromium',
     'webview.platforms.winforms',

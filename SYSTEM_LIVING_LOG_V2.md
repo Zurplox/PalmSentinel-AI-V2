@@ -2,7 +2,7 @@
 
 > **Living Engineering Document & Decision Record**
 > *Target Audience: Autonomous AI Agents and engineers taking over this project.*
-> *Last Updated: 2026-09-23 14:40:00 Local Time*
+> *Last Updated: 2026-09-23 14:15:00 Local Time*
 > *Active Workspace: `E:\Freebuff\Palm Sentinel (V2)`*
 > *Predecessor, read-only reference: `F:\PalmSentinel-AI` (log: `SYSTEM_LIVING_LOG.md`)*
 > *This log follows the predecessor's method exactly, under a different name.*
@@ -1076,7 +1076,7 @@ Within +/-1 m of planting error the error stays under 8% while the true pitch is
 **Verification.** `python -m unittest discover -s tests` -> **70 tests, OK (50.4 s)**, of which 12 are new. `python tests/ground_truth.py` reproduces every table above -> exit 0, all seven sections, **3m30s**.
 
 One defect was found in this pass's own deliverable, by running the command rather than reading it: `python tests/ground_truth.py` — the form promised by the module's docstring and by the README — died with `ModuleNotFoundError: No module named 'palmsentinel'`, because the script form puts `tests/` on `sys.path` and not the repository root; the earlier tables had only ever been produced under `PYTHONPATH=.`. Fixed in the module (the root is added explicitly rather than documented as a PYTHONPATH the caller must remember), and the script form is what produced the numbers quoted above. A second defect was found the same way: the script's pitch table was still printing the *crown-scaled* sweep while the README and this entry publish the *crown-real* one, so "reproduces every table" would have been false; the script now prints the real-palm axis and the band table, and every fraction -> error pair it prints was checked against the rows published above (0.50 +4.49%, 0.60 +3.21%, 0.65 +1.28%, 0.70 +0.64%, 0.75 +0.64%, 0.80 +0.00%, 0.85 +0.00%, 0.90 -6.41%, 0.95 -29.49%, 1.00 -48.08%). `python -m palmsentinel.cli census --image data/demo_palm_estate.jpg --gsd 4.0` -> **140 palms, 140.0 SPH, 1.0000 ha, optimal**, closest accepted pair 169.5 px against 168.8 px required — **unchanged**, because no value moved. The 138 MP figure (1,360 palms / 124.7 SPH on 10.9064 ha) is **not** re-run this pass: its ROI polygon lives in an earlier pass, no code that produces it changed, and per finding 7 it has no ground truth to be checked against anyway. `F:\PalmSentinel-AI` remains unmodified and read-only (`git status --porcelain` empty at `cd0c22e`).
-### [2026-09-23 14:40] — The independent count on real canopy: attempted, not obtained — and why the demo cannot be the target
+### [2026-09-23 14:04] — The independent count on real canopy: attempted, not obtained — and why the demo cannot be the target
 
 **Agent/Author:** Buffy (Freebuff). Pass requested by the owner: *"hand-label palms by eye on a real patch of the demo mosaic and compare that count with what the pipeline reports for the same area"*, with the annotation written and saved **before** any pipeline output was looked at, and with a material disagreement either fixed or disclosed as a measured accuracy limit.
 
@@ -1136,3 +1136,54 @@ So **140.0 SPH is 140 palms per hectare of a mixed frame**, and that is not a pl
 **Not modified:** any code, any threshold, any test, the release asset. No feature and no UI work. `F:\PalmSentinel-AI` untouched. The annotation-viewing scratch files are in `%LOCALAPPDATA%\Temp\psv2-annot\` (outside the repository, uncommitted) with a local static server on `127.0.0.1:8791` for the owner to look at the patch if useful.
 
 **Verification.** The ACF instrument was validated against known-pitch synthetic plantations before being applied (table in point 2), which is what makes its null result on the demo meaningful rather than an artefact. The frame-composition figures come from `otsu_threshold`/`vegetation_index` in `palmsentinel.detection`, run on the demo at 4 cm/px. The demo census is unchanged at 140 palms / 140.0 SPH / 1.0000 ha (`python -m unittest discover -s tests` -> 70 tests OK, unaffected).
+### [2026-09-23 14:15] — The entry point keeps startup, the harnesses keep proof: desktop_app.py split, packaged behaviour proven byte-identical
+
+**Agent/Author:** Buffy (Freebuff). Pass requested by the owner: *"desktop_app.py is 563 lines and roughly 300 of them are two verification harnesses, so the file whose stated job is to open a window is also the second owner of 'is this build correct'. Extract that verification into a module of its own … keeping every CLI flag behaving exactly as it does now"*, with the packaged build rebuilt and the release refreshed.
+
+**What was wrong, in the audit's terms.** Two owners for one claim. `desktop_app.py` opened the window *and* decided whether the build was correct, so a change to what "correct" means could land in the file whose job is to launch, and the packaged `--selftest` path -- the only check that runs in the shipped binary -- lived in the same file as the window it verifies. Ownership is now split along the obvious line: startup in the entry point, proof in a module of its own.
+
+**The split.**
+
+| | before | after |
+| --- | --- | --- |
+| `desktop_app.py` | 599 lines: window **and** both harnesses | **239 lines**: window, geometry, port, preflight, flag dispatch |
+| `verification.py` | did not exist | **388 lines**: `check()`, `census_selftest()`, `window_selftest()`, report writing, and the expected demo result |
+
+Net +28 lines, and that is worth stating plainly: the goal was ownership, not line count. The file that opens a window is 360 lines shorter; the increase is the new module's docstring (which carries the *why* for each harness) plus named homes for the window geometry.
+
+Two structural consequences beyond moving code:
+
+* **The window has one definition.** `create_window(webview, claimed, app)` and the `WINDOW_SIZE` / `WINDOW_MIN_SIZE` / `WINDOW_BACKGROUND` constants replace two verbatim copies of the `create_window(...)` arguments -- one in `main`, one in the window self-test. A change to the window could previously be made in one place and silently not apply to the other, which would have made the self-test evidence for a window the user does not get.
+* **The expected demo result moved with the harnesses** (`EXPECTED_DEMO_PALMS` / `EXPECTED_DEMO_SPH`). It is a property of the verification, not of opening a window.
+
+Cross-module names are now public on purpose: `require_webview`, `build_app`, `start_preload`, `disable_page_zoom`, `claim_port`, `window_title`, `create_window`, `WINDOW_TITLE`. `_report_fatal` stays private -- only `claim_port` uses it. The dependency direction is one way (`verification` imports `desktop_app`; the entry point imports `verification` lazily inside `__main__` for the two verification flags), so there is no import cycle and importing the entry point does not drag the harnesses in.
+
+**Provably unchanged, measured rather than asserted.** Baselines were captured *before* the refactor from source and from the packaged build that then existed, then re-captured after, and diffed:
+
+| harness | source | packaged |
+| --- | --- | --- |
+| `--check` | **identical** (186 bytes, exit 0) | **identical** (exit 0) |
+| `--selftest` | **identical** (934 bytes, exit 0) | **identical** (exit 0) |
+| `--selftest --window` | **identical** (1,159 bytes, exit 0) | **identical** (exit 0) |
+
+All six comparisons are byte-for-byte, not "same numbers". The figures they carry are unchanged: **140 palms / 140.0 SPH / 1.0000 ha / band optimal**, closest accepted pair 169.532 px against 168.75 px required, and the export byte counts are identical to every previous pass -- **csv 10,568, geojson 54,288, annotated 3,006,439**, preview raster 2,656,531. `python -m unittest discover -s tests` -> **70 tests, OK**.
+
+**The spec needed one line.** `verification` is imported from `__main__`, i.e. only in the shipped binary -- exactly the class of import that is present in source and absent from a frozen build. It is now declared in `hiddenimports` with its reason, alongside the other dynamic imports. The packaged self-tests are the proof it was collected; the declaration is so that a future edit cannot break `--selftest` in a way that only shows up in a zip.
+
+**The packaged artifact, rebuilt clean and republished.**
+
+* `rm -rf build dist`, then `pyinstaller --noconfirm --clean PalmSentinelV2.spec` -> 46 s, `dist/PalmSentinelV2/` holding `PalmSentinelV2.exe` and `_internal/` and **no** `data/` folder, which is what a fresh spec run produces.
+* Zipped **before** the built app was ever run, so the archive is the pristine build; verified from the archive's own manifest that the only entry beside `_internal/` is `PalmSentinelV2.exe`.
+* Verified from the **extracted archive**, not from the build tree: `--check` passes with a `PATH` of `C:\Windows\System32;C:\Windows` and no Python on it at all (exit 0, 16 routes), and both self-tests pass with the numbers above.
+* **Release `v2.0.2`** -- `PalmSentinelV2-win64.zip`, **85,463,561 bytes**, sha256 `c8eac92634979652e994b8a6423a7b3bf4ba225d43732b9501da0f2d429177f9`, `/releases/latest` resolving to it, and the asset fetched back through the API with a matching digest and through the web URL with HTTP 206. `v2.0.0` and `v2.0.1` are left in place.
+
+**Two mistakes of mine in this pass, both corrected and both worth recording.** The asset first uploaded under its temporary filename (`PalmSentinelV2-win64-v2.0.2.zip`) rather than `PalmSentinelV2-win64.zip`, because `gh release create` ignored the `path#name` form; the mis-named asset was deleted and re-uploaded with the right name, and the digest is unchanged. And the first extraction attempt passed an MSYS path into a Windows Python, which created a stray 194 MB tree at `C:\c\Users\...`; it was inspected, confirmed to be only that extraction, and removed.
+
+**`Launcher.cs` was left alone, deliberately.** The same audit names it as having five tangled jobs (dependency preflight, interpreter search, log file, failure dialog, process launching) and the request explicitly records the decision not to touch it. The reasons, for whoever revisits this: its **three launch branches were hard-won and are individually verified** -- packaged build present; no packaged build with all packages present; no packaged build with packages missing and named -- and each of those branches cost a defect to get right (the quote-inspection bug in `BuildArguments`, the double-echoed console output, a stale compiled `.exe` that was newer-looking than its source). Rewriting it this late would put all three at risk for a code-shape gain no user can see, and it is the one component whose behaviour is only observable through a log file and a modal dialog, so a regression there is the hardest to catch and the easiest to ship. Untangling it is a legitimate follow-up; it is not a safe tail-end of a refactor pass. **Decision: no change, recorded rather than done.**
+
+**Files modified:** `desktop_app.py` (startup only), `verification.py` (new), `PalmSentinelV2.spec` (one hidden import), `README.md` (release version, size, sha256; the two layout rows), this log.
+**Not modified:** `Launcher.cs` or `PalmSentinel.exe`, any pipeline/detection/tiling code, the web layer, templates, stylesheets or client scripts, any threshold, any test, the previous release assets. No feature, no UI change. `F:\PalmSentinel-AI` untouched (`git status --porcelain` empty at `cd0c22e`).
+
+**Verification.** Six byte-identical harness outputs (three source, three packaged) diffed against pre-refactor baselines; `python -m unittest discover -s tests` -> 70 tests OK; the release candidate extracted and self-tested outside the repository with a scrubbed `PATH`; the published asset re-downloaded and its sha256 compared to the local zip and to the digest the API reports.
+
+**One metadata correction, made rather than inherited.** The previous entry carried the heading `[2026-09-23 14:40]`, a timestamp chosen by hand rather than read from the clock, which left the log out of order -- the entry below it in that turn really happened around 14:04. It has been re-stamped to its own commit time (`2f04a08`, 14:04:37), so the headings now run chronologically and each one is traceable to a commit.

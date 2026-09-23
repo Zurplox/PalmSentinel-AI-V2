@@ -17,8 +17,9 @@ Full analysis, numbers and evidence: [`SYSTEM_LIVING_LOG_V2.md`](SYSTEM_LIVING_L
 
 ### The packaged build — needs nothing installed
 
-**[Download the standalone Windows build (v2.0.1)](https://github.com/Zurplox/PalmSentinel-AI-V2/releases/latest)**
-— `PalmSentinelV2-win64.zip`, about 80 MB. Unzip it anywhere and run
+**[Download the standalone Windows build (v2.0.2)](https://github.com/Zurplox/PalmSentinel-AI-V2/releases/latest)**
+— `PalmSentinelV2-win64.zip`, 85,463,561 bytes (~81 MB), sha256
+`c8eac92634979652e994b8a6423a7b3bf4ba225d43732b9501da0f2d429177f9`. Unzip it anywhere and run
 `PalmSentinelV2.exe` from inside; the bundled demo orthomosaic loads on first run,
 so the first census works with nothing else installed. Windows SmartScreen may warn
 about an unknown publisher, because the build is not code-signed.
@@ -273,7 +274,8 @@ unverified.
 | `palmsentinel/cli.py` | Headless single-image census. |
 | `web/` | HTTP surface: `store.py` owns the loaded image, `views.py` owns the contracts. |
 | `templates/`, `static/` | The interface. No CSS framework; the design system is `static/css/app.css`. |
-| `desktop_app.py` | The desktop window, and the `--check` / `--selftest` entry points. |
+| `desktop_app.py` | The desktop window: startup, geometry, port, dependency preflight. Dispatches `--check` / `--selftest` to `verification.py`. |
+| `verification.py` | The three self-test harnesses: stack preflight, headless census, and the run driven inside the real window. |
 | `app.py` | Browser entry point: the same application served on `127.0.0.1:5000`, no window. |
 | `paths.py` | Where files live: read-only assets in the bundle, writable library beside the exe. |
 | `ports.py` | Which port an instance serves on, and the guarantee that two never share one. |
