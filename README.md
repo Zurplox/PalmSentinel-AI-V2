@@ -177,9 +177,20 @@ why a self-referential audit could not see it.
 **The V2 column is a measurement, not a verified truth.** Neither block has an
 independent ground truth: `estate_sensus_summary.json` in the predecessor's
 `output/` is V1's *own* export — it is the run that reports 556.2 SPH — and the
-demo mosaic carries no labels. 140 and 124.7 are consistent with a mature block
-planted to the estate standard. They are not evidence of one. What can be said
-instead is below.
+demo mosaic carries no labels.
+
+The demo frame is also not the clean plantation its 1.0000 ha suggests. Measured
+on the imagery, by this project's own Otsu threshold on excess green, **46.5%** of
+the frame is vegetation and **7.4%** is bright, non-vegetated ground: a track
+crosses it diagonally and the overview shows bare patches. So `140.0 SPH` is palms
+per hectare of a **mixed frame**, which is not the same quantity as a planting
+density — the same 140 palms over the 0.465 ha that clears the vegetation
+threshold would read 301 SPH, and over the 0.926 ha that is not bright non-canopy,
+151 SPH. That frame also does not show the planting at all: spatial
+autocorrelation of its canopy greenness — an instrument validated on synthetic
+plantations, where it returns a planted 9.0 m pitch as 9 m and a 7.4 m pitch as
+7 m — finds the demo repeating at **4 m and 12 m and not at 9 m**. A frame that
+lands on a benchmark-looking 140 by coincidence is not evidence for that benchmark.
 
 ## Is the number true?
 
@@ -232,6 +243,23 @@ band (6.9% against 13.5%), but on real imagery the radius does most of its work
 suppressing frond apexes — 628 raw candidates become 140 on the demo — and a
 uniform synthetic crown cannot measure that side of the trade. 0.75 therefore
 stands, and settling the last 0.05 needs a hand-labelled real patch.
+
+### What this does not verify
+
+There is still **no independent count on real canopy**, and this pass did not
+obtain one. Hand-labelling a patch by eye was attempted and **not completed**: the
+environment cannot display images to the agent that ran the pass, and text
+renderings of the imagery — luminance, local contrast, crown-scale smoothing,
+excess-green and bud-yellowness, at 1.0, 0.5 and 0.25 m per character — resolve a
+closed mature canopy as frond texture rather than as individual palm centres. No
+labels were invented from those renderings; a fabricated annotation is a worse
+outcome than a disclosed gap.
+
+The step outstanding is small and needs eyes: open `data/demo_palm_estate.jpg` in
+any image viewer, and click or note each palm centre in a 40 × 40 m patch
+(x 30–70 m, y 30–70 m), then compare that count against the census of the same
+polygon. Until that exists, treat every real-imagery figure above as
+unverified.
 
 ## Layout
 

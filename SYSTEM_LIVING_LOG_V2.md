@@ -2,7 +2,7 @@
 
 > **Living Engineering Document & Decision Record**
 > *Target Audience: Autonomous AI Agents and engineers taking over this project.*
-> *Last Updated: 2026-09-23 13:39:00 Local Time*
+> *Last Updated: 2026-09-23 14:40:00 Local Time*
 > *Active Workspace: `E:\Freebuff\Palm Sentinel (V2)`*
 > *Predecessor, read-only reference: `F:\PalmSentinel-AI` (log: `SYSTEM_LIVING_LOG.md`)*
 > *This log follows the predecessor's method exactly, under a different name.*
@@ -1076,3 +1076,63 @@ Within +/-1 m of planting error the error stays under 8% while the true pitch is
 **Verification.** `python -m unittest discover -s tests` -> **70 tests, OK (50.4 s)**, of which 12 are new. `python tests/ground_truth.py` reproduces every table above -> exit 0, all seven sections, **3m30s**.
 
 One defect was found in this pass's own deliverable, by running the command rather than reading it: `python tests/ground_truth.py` — the form promised by the module's docstring and by the README — died with `ModuleNotFoundError: No module named 'palmsentinel'`, because the script form puts `tests/` on `sys.path` and not the repository root; the earlier tables had only ever been produced under `PYTHONPATH=.`. Fixed in the module (the root is added explicitly rather than documented as a PYTHONPATH the caller must remember), and the script form is what produced the numbers quoted above. A second defect was found the same way: the script's pitch table was still printing the *crown-scaled* sweep while the README and this entry publish the *crown-real* one, so "reproduces every table" would have been false; the script now prints the real-palm axis and the band table, and every fraction -> error pair it prints was checked against the rows published above (0.50 +4.49%, 0.60 +3.21%, 0.65 +1.28%, 0.70 +0.64%, 0.75 +0.64%, 0.80 +0.00%, 0.85 +0.00%, 0.90 -6.41%, 0.95 -29.49%, 1.00 -48.08%). `python -m palmsentinel.cli census --image data/demo_palm_estate.jpg --gsd 4.0` -> **140 palms, 140.0 SPH, 1.0000 ha, optimal**, closest accepted pair 169.5 px against 168.8 px required — **unchanged**, because no value moved. The 138 MP figure (1,360 palms / 124.7 SPH on 10.9064 ha) is **not** re-run this pass: its ROI polygon lives in an earlier pass, no code that produces it changed, and per finding 7 it has no ground truth to be checked against anyway. `F:\PalmSentinel-AI` remains unmodified and read-only (`git status --porcelain` empty at `cd0c22e`).
+### [2026-09-23 14:40] — The independent count on real canopy: attempted, not obtained — and why the demo cannot be the target
+
+**Agent/Author:** Buffy (Freebuff). Pass requested by the owner: *"hand-label palms by eye on a real patch of the demo mosaic and compare that count with what the pipeline reports for the same area"*, with the annotation written and saved **before** any pipeline output was looked at, and with a material disagreement either fixed or disclosed as a measured accuracy limit.
+
+**Outcome, stated first because it is the point of the entry: no independent count was obtained, and none was fabricated.** The annotation could not be performed in this environment. What the pass does deliver is (a) a validated independent instrument, (b) the measurement that the demo mosaic cannot serve as a validation target even in principle, and (c) a precise statement of what is still unverified. Every number below is quoted from a run in this pass.
+
+**1. Why the annotation was not done.** The requested method is a human eye on the imagery. This session has no image display: `preview_screenshot` fails for every tab including the live application with *"it produced no frames, which means the preview webview is not being composited"*, and reloading and re-opening does not change it. The imagery was therefore inspected through text renderings of its pixels, and five were tried over the 40 x 40 m patch (x 30-70 m, y 30-70 m) and a 20 x 20 m quadrant of it:
+
+| rendering | scale | result |
+| --- | --- | --- |
+| luminance | 1.0 m/char (whole frame) | canopy texture; bright diagonal track visible |
+| luminance, local contrast | 0.25 m/char | frond texture; **no** individual palm centres resolvable |
+| luminance, smoothed to crown scale (sigma 1.6 m) | 0.5 m/char | canopy-scale bright blobs that merge across neighbouring palms |
+| excess green (2G-R-B) | 0.25 m/char | frond texture, noisier than luminance |
+| bud yellowness (R+G-2B), smoothed 1.4 m | 0.5 m/char | connected bands and large blank regions, not discrete per-palm dots |
+
+A closed mature oil palm canopy does not read as separate palm centres in a character grid at any scale tested. **Labelling palms from those renders would have produced a confident-looking number with no basis**, which is the exact failure this project exists to correct, so it was not done and no labels file was written. This is recorded as a **limitation of the pass**, not of the pipeline.
+
+**2. An independent instrument, validated before use.** To have something checkable, spatial autocorrelation of canopy greenness was used: a different principle from any detector (it measures a spatial *period*, not an object), and it can be read as text. It was first validated on synthetic plantations of exactly known pitch, analysed identically (region, smoothing sigma 0.7 m, FFT autocorrelation, profiles along x, along y and radially, local maxima at 1-15 m):
+
+| planted pitch | planting error | local maxima recovered |
+| --- | --- | --- |
+| 9.0 m | 0.0 m | x **[9]**, y none |
+| 9.0 m | 1.0 m | x **[9]**, y none |
+| 7.4 m | 0.0 m | x **[7]**, y [13] |
+
+It recovers the planted pitch exactly, with and without planting error. **The instrument is therefore trustworthy on imagery whose answer is known.**
+
+**3. Applied to the demo, it does not find the planting.** Same analysis, demo mosaic, greenness, profiles in metres:
+
+| lag (m) | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| along x | 0.73 | 0.29 | 0.15 | **0.23** | 0.22 | 0.11 | 0.05 | 0.07 | 0.08 | 0.09 | 0.15 | **0.19** | 0.15 | 0.10 | 0.14 |
+| along y | 0.79 | 0.44 | 0.32 | **0.36** | 0.35 | 0.29 | 0.25 | 0.24 | 0.20 | 0.18 | 0.22 | **0.26** | 0.22 | 0.12 | 0.09 |
+| radial | 0.71 | 0.37 | 0.24 | **0.27** | 0.24 | 0.16 | 0.15 | 0.18 | 0.17 | 0.13 | 0.12 | 0.14 | 0.13 | 0.10 | 0.10 |
+
+Local maxima at **4 m, 8 m and 12 m** in both axes (interior 36 x 36 m patch: 5 m and 12 m), and **the 9 m lag is a valley, not a peak** (x 0.08, y 0.20, both below their neighbours at 4 m and 12 m). A plantation at the standard's 9 m pitch would have shown a peak at 9 m, as the synthetic case does. The demo's canopy does not carry the planting structure the benchmark assumes.
+
+**4. What the demo frame actually is.** 100 x 100 m at 4 cm/px, 1.0000 ha, of which — measured on the imagery with this project's own Otsu threshold on excess green:
+
+```
+vegetation  (ExG >= 58.9)         46.5% of the frame
+bright, non-vegetated ground       7.4%   (a diagonal track and bare patches)
+remaining (shaded canopy, gaps)   ~46%
+```
+
+So **140.0 SPH is 140 palms per hectare of a mixed frame**, and that is not a planting density. Depending on which part of the frame is treated as plantable, the same 140 palms reads **301 SPH** (over the 46.5% that clears the vegetation threshold) or **151 SPH** (over the 92.6% that is not bright non-canopy). The demo was the tuning surface for `min_spacing_fraction`; it cannot be the validation surface, and its agreement with the 136-143 benchmark band may be coincidence rather than confirmation.
+
+**5. Verdict on the request's decision rule.** The instruction was: if the disagreement is material, either fix it or disclose it as a measured accuracy limit. There is no count-versus-count disagreement to report, because no independent count was obtained. The disclosures that are earned by measurement are these:
+
+* **The real-canopy accuracy of this pipeline remains unmeasured.** It is not merely unverified by absence of data; an attempt was made in this pass and failed for environmental reasons, and the demo frame is disqualified as a target on its own measurements (points 3 and 4).
+* **The demo's 140.0 SPH must be read as a frame density over mixed land use.** That has been written into the README's numbers section.
+* **No label file was created**, because no labels were justified. Creating an empty template would have misrepresented the state.
+
+**6. The step that remains, precisely.** Open `data/demo_palm_estate.jpg` in any image viewer, count palm centres in the 40 x 40 m patch (x 30-70 m, y 30-70 m; the same patch used for all rendering attempts above), write each centre's (x, y) in metres, and compare against `python -m palmsentinel.cli census --image data/demo_palm_estate.jpg --gsd 4.0 --polygon` for that polygon. For a real estate number rather than a demo number, the 138 MP `blok_tm_utara` flight line is the right target, since the demo is a mixed frame. Until one of those exists, every real-imagery figure in this project is unverified, and the synthetic ground truth of the previous pass is the only quantitative accuracy evidence there is.
+
+**Files modified:** `README.md` (the numbers section now states the demo's frame composition, the autocorrelation result and the failed-annotation disclosure; new *What this does not verify* subsection), this log.
+**Not modified:** any code, any threshold, any test, the release asset. No feature and no UI work. `F:\PalmSentinel-AI` untouched. The annotation-viewing scratch files are in `%LOCALAPPDATA%\Temp\psv2-annot\` (outside the repository, uncommitted) with a local static server on `127.0.0.1:8791` for the owner to look at the patch if useful.
+
+**Verification.** The ACF instrument was validated against known-pitch synthetic plantations before being applied (table in point 2), which is what makes its null result on the demo meaningful rather than an artefact. The frame-composition figures come from `otsu_threshold`/`vegetation_index` in `palmsentinel.detection`, run on the demo at 4 cm/px. The demo census is unchanged at 140 palms / 140.0 SPH / 1.0000 ha (`python -m unittest discover -s tests` -> 70 tests OK, unaffected).
