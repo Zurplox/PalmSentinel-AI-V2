@@ -21,6 +21,7 @@ import unittest
 
 import cv2
 import numpy as np
+import os
 
 from palmsentinel.agronomy import (
     INDUSTRY_TARGET_SPH,
@@ -467,6 +468,69 @@ class TestSensitivity(unittest.TestCase):
         # Suppression may absorb added candidates, but the census may not lose
         # palms it had already found at the stricter bar.
         self.assertGreaterEqual(low.total_palms, baseline.total_palms)
+
+
+class TestDenseStandard(unittest.TestCase):
+    """The dense-mature standard: same grid assumption and crown optics as
+    mature, only the exclusion fraction relaxed (0.65 -> 5.85 m floor).
+
+    For compact blocks where mature crowns stand tighter than the textbook
+    grid: admits strong neighbours the 6.75 m floor deletes, while staying
+    above the ~4 m frond-structure band where the count collapses (measured
+    elbow). Opt-in per survey zone; the default standard is untouched.
+    """
+
+    def test_floor_sits_inside_the_physical_window(self):
+        dense = get_standard("dense")
+        mature = get_standard("mature")
+        self.assertGreater(dense.min_spacing_m, 4.0)
+        self.assertLess(dense.min_spacing_m, 7.8)
+        self.assertAlmostEqual(dense.min_spacing_m, 5.85)
+        self.assertEqual(dense.blur_m, mature.blur_m)
+        self.assertEqual(dense.peak_separation_m, mature.peak_separation_m)
+        self.assertEqual(dense.expected_spacing_m, mature.expected_spacing_m)
+
+    def test_admits_more_than_mature_without_leaving_crown_scale(self):
+        from palmsentinel.pipeline import nearest_neighbour_summary
+
+        image = cv2.imread(os.path.join("data", "demo_palm_estate.jpg"),
+                           cv2.IMREAD_COLOR)
+        self.assertIsNotNone(image, "bundled demo orthomosaic missing")
+        scale = GroundScale(4.0)
+        results = {}
+        for key in ("mature", "dense"):
+            result = run_census(
+                image,
+                CensusConfig(standard=get_standard(key), scale=scale),
+            )
+            points = [(p.x_px, p.y_px) for p in result.palms]
+            nn = nearest_neighbour_summary(points, scale.m_per_px)
+            results[key] = (result, nn)
+        mature, dense = results["mature"], results["dense"]
+        self.assertGreater(dense[0].total_palms, mature[0].total_palms)
+        self.assertGreaterEqual(nn_mode(dense[1]), 6.0)
+        self.assertTrue(dense[0].diagnostics["spacing_invariant_ok"])
+
+    def test_no_regression_on_uniform_synthetic_stands(self):
+        from synthetic import jittered_lattice
+
+        scale = GroundScale(4.0)
+        points = jittered_lattice(9.0, 14, 14, jitter_m=0.0, seed=7)
+        image, poly = render_plantation(points, scale, crown_radius_m=3.0,
+                                        apex_radius_m=1.0, margin_m=12.0)
+        counts = {}
+        for key in ("mature", "dense"):
+            counts[key] = run_census(
+                image,
+                CensusConfig(standard=get_standard(key), scale=scale,
+                             polygon=poly),
+            ).total_palms
+        self.assertAlmostEqual(counts["dense"] / counts["mature"], 1.0,
+                               delta=0.03)
+
+
+def nn_mode(nn):
+    return float(nn.get("nn_mode_m", 0.0))
 
 
 if __name__ == "__main__":

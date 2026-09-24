@@ -17,9 +17,9 @@ Full analysis, numbers and evidence: [`SYSTEM_LIVING_LOG_V2.md`](SYSTEM_LIVING_L
 
 ### The packaged build — needs nothing installed
 
-**[Download the standalone Windows build (v2.0.8)](https://github.com/Zurplox/PalmSentinel-AI-V2/releases/latest)**
-— `PalmSentinelV2-win64.zip`, 83,417,127 bytes (~80 MB), sha256
-`de27f62623998c6af25bfd42516ed93e084af08161a2457259d999e74a9a63b5`. Unzip it anywhere and run
+**[Download the standalone Windows build (v2.0.9)](https://github.com/Zurplox/PalmSentinel-AI-V2/releases/latest)**
+— `PalmSentinelV2-win64.zip`, 83,416,866 bytes (~80 MB), sha256
+`2437d8ca20cfc8e6e7bccac590d53becfb2d809ae959cc47f214a3853f74422f`. Unzip it anywhere and run
 `PalmSentinelV2.exe` from inside; the bundled demo orthomosaic loads on first run,
 so the first census works with nothing else installed. Windows SmartScreen may warn
 about an unknown publisher, because the build is not code-signed.

@@ -262,6 +262,22 @@ PALM_STANDARDS = {
         peak_separation_m=1.05,
         vegetation_threshold=None,
     ),
+    "dense": PalmStandard(
+        key="dense",
+        label="Dense Mature (TM Padat / Compact Blocks)",
+        # Same 9 m grid assumption and mature crown optics as "mature"; only
+        # the exclusion fraction is relaxed (0.65 -> 5.85 m floor). For blocks
+        # where mature crowns stand tighter than the textbook grid (planting
+        # error, lean, compact soil): admits strong neighbours the 6.75 m
+        # floor deletes, while staying above the ~4 m frond-structure band
+        # where the count collapses into fronds (measured elbow at ~4.8 m).
+        # Opt-in per survey zone; the default standard is untouched.
+        expected_spacing_m=9.0,
+        min_spacing_fraction=0.65,
+        blur_m=1.25,
+        peak_separation_m=1.45,
+        vegetation_threshold=None,
+    ),
 }
 
 DEFAULT_STANDARD_KEY = "mature"

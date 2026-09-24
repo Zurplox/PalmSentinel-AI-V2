@@ -173,7 +173,7 @@ def build_parser() -> argparse.ArgumentParser:
     census = sub.add_parser("census", help="Run a census")
     add_common(census)
     census.add_argument("--standard", default=DEFAULT_STANDARD_KEY,
-                        choices=["mature", "young"])
+                        choices=["mature", "young", "dense"])
     census.add_argument("--tile-px", type=int, default=1536)
     census.add_argument("--threshold", type=float, default=None,
                         help="Override the Otsu vegetation threshold (index units)")
