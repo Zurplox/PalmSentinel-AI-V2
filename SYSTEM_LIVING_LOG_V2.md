@@ -1410,3 +1410,7 @@ Kept deliberately: the direct-run `sys.path` shim (a measured `ModuleNotFoundErr
 **Files modified:** `static/js/render.js` (both gates), `static/js/state.js` (`overlays.rosette`), `static/js/panels.js` (bind, listen, sync), `templates/index.html` (the second switch with an honest tooltip for each), `tests/test_ui_contract.py`, `tests/golden/selftest.txt`, `README.md` (the two overlays and the measured evidence), this log.
 
 **Not modified:** the pipeline, detection, tiling, agronomy standards, thresholds, exports, `web/`, `desktop_app.py`, `ports.py`, `verification.py`, `Launcher.cs`, `PalmSentinelV2.spec`. `F:\PalmSentinel-AI` untouched.
+
+### [2026-09-24] - Captain's pass: marker trim shipped as v2.0.8; FreeBuff retired
+
+Owner retired the second agent; OpenCode session is sole captain. Slider semantics verified reconciled in-tree (payload sends sensitivity fraction only; absolute threshold is API/CLI-level). Marker cap 26->12 committed (83fc4bd), README digest (b02c13d), local clean rebuild verified (--check/--selftest/--window green), v2.0.8 published (PalmSentinelV2-win64.zip, 83,417,127 bytes, sha256 de27f626...). Standing verdict unchanged: nothing principled reaches 2,500 crowns on the 16 ha mosaic; records reconciliation is the owner's side.
