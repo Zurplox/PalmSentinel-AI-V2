@@ -19,7 +19,10 @@ import { api, loadImage } from './api.js';
 import { polygonAreaPx } from './geometry.js';
 
 const PALM_MARKER_MIN = 1.6;
-const PALM_MARKER_MAX = 26;
+// Capped small: the marker is a pin, not a portrait. A 26 px blob paved over
+// neighbouring fronds on closed canopy and read as one circle covering
+// several trees; the count never looked at markers, but owners do.
+const PALM_MARKER_MAX = 12;
 const LABEL_LIMIT = 420;
 const NATIVE_CACHE_LIMIT = 4;
 const NATIVE_MAX_DIM = 2048;
